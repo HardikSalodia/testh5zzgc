@@ -10,10 +10,8 @@
 
         <!--
             Core AR.js / A-Frame stack.
-            IMPORTANT: AR.js is pinned to a tagged release (3.4.7) instead of "master".
-            Pointing at master means AR.js can change under you without warning and
-            silently break camera init — this is a common cause of "camera stopped
-            working" reports that have nothing to do with your own code.
+            AR.js pinned to a tagged release (3.4.7) instead of "master" so it can't
+            change under you and silently break camera init.
         -->
         <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
         <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
@@ -22,17 +20,14 @@
         <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
 
         <!--
-            THREE.js post-processing addons for the bloom effect.
-            Must match the three.js revision bundled inside A-Frame 1.0.4 (r115).
-            If bloom doesn't appear, check `THREE.REVISION` in devtools and swap the
-            version below to match.
+            NOTE: full-screen post-processing bloom (EffectComposer + UnrealBloomPass)
+            was removed. It renders through its own opaque/off-screen render targets,
+            which repeatedly fought with the transparent canvas AR.js relies on to show
+            the camera feed underneath — that's what was causing the black screen.
+            The glow effect below is done with normal, forward-rendered scene objects
+            (emissive material + an additive glow sprite), so A-Frame's default render
+            path — and the camera passthrough — is never touched.
         -->
-        <script src="https://unpkg.com/three@0.115.0/examples/js/shaders/CopyShader.js"></script>
-        <script src="https://unpkg.com/three@0.115.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-        <script src="https://unpkg.com/three@0.115.0/examples/js/postprocessing/EffectComposer.js"></script>
-        <script src="https://unpkg.com/three@0.115.0/examples/js/postprocessing/RenderPass.js"></script>
-        <script src="https://unpkg.com/three@0.115.0/examples/js/postprocessing/ShaderPass.js"></script>
-        <script src="https://unpkg.com/three@0.115.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 
         <style>
             html, body {
@@ -187,7 +182,6 @@
             id="scene"
             embedded
             gesture-detector
-            bloom-effect
             day-night-cycle
         >
             <a-assets timeout="15000">
@@ -211,6 +205,13 @@
                 emitevents="true"
                 cursor="fuse: false; rayOrigin: mouse;"
             >
+                <!--
+                    No position attribute here, same as your original file — the model
+                    sits at the marker's own local origin, i.e. exactly on top of it.
+                    Only the scale is now computed automatically (see auto-fit-model)
+                    instead of a hardcoded magic number, so proportions stay correct
+                    no matter the asset's raw size. Tune the look with targetSize below.
+                -->
                 <a-entity
                     id="bowser-model"
                     animation-mixer="loop: repeat"
@@ -219,6 +220,7 @@
                     gesture-handler
                     shadow="cast: false; receive: false"
                     auto-fit-model="targetSize: 0.35"
+                    model-night-glow
                 ></a-entity>
             </a-marker>
 
@@ -245,16 +247,14 @@
         </div>
 
         <script>
-            // Detect mobile so we can drop render resolution / bloom cost further.
+            // Detect mobile so we can drop render resolution for performance.
             var IS_MOBILE = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
 
             /**
              * Camera preflight check.
-             * AR.js's own webcam init fails silently in a lot of common situations —
-             * insecure origin (not https/localhost), permission denied, or no camera
-             * present. This runs a quick getUserMedia test up front with the rear
-             * camera requested explicitly, shows a clear on-screen reason if it fails,
-             * and immediately releases the test stream so AR.js can open its own.
+             * Tests getUserMedia up front with the rear camera requested explicitly,
+             * shows a clear on-screen reason if it fails, then immediately releases
+             * the test stream so AR.js can open its own.
              */
             (function cameraPreflight() {
                 var errorBox = document.getElementById('camera-error');
@@ -278,7 +278,6 @@
                 navigator.mediaDevices
                     .getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
                     .then(function (stream) {
-                        // Permission granted — release immediately so AR.js can take over the camera.
                         stream.getTracks().forEach(function (track) { track.stop(); });
                     })
                     .catch(function (err) {
@@ -296,10 +295,10 @@
 
             /**
              * auto-fit-model
-             * Waits for the glTF model to load, measures its real bounding box, then
-             * uniformly scales it to a target physical size and re-centers it so it
-             * sits upright on the marker. Replaces fragile hardcoded scale values that
-             * only worked for one specific .glb's dimensions.
+             * Measures the loaded model's real bounding box and applies a uniform
+             * scale to hit a target size — proportions stay correct regardless of the
+             * asset's raw dimensions. Position is intentionally left untouched so the
+             * model sits exactly where it did before (at the marker's local origin).
              */
             AFRAME.registerComponent('auto-fit-model', {
                 schema: {
@@ -311,42 +310,116 @@
                         var mesh = evt.detail.model || self.el.getObject3D('mesh');
                         if (!mesh) return;
 
-                        // Reset any prior transform before measuring.
                         mesh.scale.set(1, 1, 1);
-                        mesh.position.set(0, 0, 0);
                         mesh.updateMatrixWorld(true);
 
                         var box = new THREE.Box3().setFromObject(mesh);
                         var size = new THREE.Vector3();
                         box.getSize(size);
-                        var center = new THREE.Vector3();
-                        box.getCenter(center);
 
                         var maxDimension = Math.max(size.x, size.y, size.z) || 1;
                         var scaleFactor = self.data.targetSize / maxDimension;
 
-                        // Uniform scale preserves proportions — never scale axes independently.
+                        // Uniform scale only — never scale axes independently, that's
+                        // what causes stretched/squashed proportions.
                         self.el.setAttribute('scale', {
                             x: scaleFactor,
                             y: scaleFactor,
                             z: scaleFactor
                         });
 
-                        // Re-center horizontally and drop the model so its base sits on the marker (y = 0).
-                        self.el.setAttribute('position', {
-                            x: -center.x * scaleFactor,
-                            y: -box.min.y * scaleFactor,
-                            z: -center.z * scaleFactor
+                        self.el.emit('modelfitted', { scaleFactor: scaleFactor, size: size }, false);
+                    });
+                }
+            });
+
+            /**
+             * model-night-glow
+             * A safe stand-in for full-screen bloom: boosts emissive glow on the
+             * model's own materials and adds a soft additive glow sprite behind it.
+             * Both are normal forward-rendered scene content, so nothing here
+             * touches the render target the AR camera feed depends on.
+             */
+            AFRAME.registerComponent('model-night-glow', {
+                init: function () {
+                    var self = this;
+                    this.emissiveMaterials = [];
+                    this.glowSprite = null;
+
+                    this.el.addEventListener('model-loaded', function (evt) {
+                        var mesh = evt.detail.model || self.el.getObject3D('mesh');
+                        if (!mesh) return;
+
+                        // Collect any materials capable of emissive glow.
+                        mesh.traverse(function (node) {
+                            if (node.isMesh && node.material) {
+                                var mats = Array.isArray(node.material) ? node.material : [node.material];
+                                mats.forEach(function (mat) {
+                                    if ('emissive' in mat) {
+                                        mat.emissive = mat.emissive || new THREE.Color(0x000000);
+                                        mat.emissiveIntensity = 0;
+                                        self.emissiveMaterials.push(mat);
+                                    }
+                                });
+                            }
                         });
                     });
+
+                    this.el.addEventListener('modelfitted', function (evt) {
+                        var size = evt.detail.size;
+                        var scaleFactor = evt.detail.scaleFactor;
+                        self.createGlowSprite(size, scaleFactor);
+                    });
+
+                    this.el.sceneEl.addEventListener('daynightchange', function (e) {
+                        var t = e.detail.nightAmount;
+
+                        self.emissiveMaterials.forEach(function (mat) {
+                            mat.emissive.setRGB(1.0, 0.75, 0.4);
+                            mat.emissiveIntensity = t * 0.6;
+                        });
+
+                        if (self.glowSprite) {
+                            self.glowSprite.material.opacity = t * 0.75;
+                        }
+                    });
+                },
+
+                createGlowSprite: function (size, scaleFactor) {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 128;
+                    canvas.height = 128;
+                    var ctx = canvas.getContext('2d');
+                    var gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+                    gradient.addColorStop(0, 'rgba(255, 200, 120, 0.9)');
+                    gradient.addColorStop(1, 'rgba(255, 200, 120, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, 128, 128);
+
+                    var texture = new THREE.CanvasTexture(canvas);
+                    var material = new THREE.SpriteMaterial({
+                        map: texture,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false,
+                        transparent: true,
+                        opacity: 0
+                    });
+
+                    var sprite = new THREE.Sprite(material);
+                    var glowSize = Math.max(size.x, size.y, size.z) * scaleFactor * 1.6;
+                    sprite.scale.set(glowSize, glowSize, 1);
+                    sprite.position.set(0, (size.y * scaleFactor) / 2, 0);
+
+                    this.el.object3D.add(sprite);
+                    this.glowSprite = sprite;
                 }
             });
 
             /**
              * day-night-cycle
              * Reads the slider (0 = full day, 100 = full night) and interpolates
-             * light color/intensity. Forwards the "night amount" to bloom-effect
-             * so glow strengthens after dark.
+             * light color/intensity. Emits 'daynightchange' on the scene so other
+             * components (model-night-glow) can react.
              */
             AFRAME.registerComponent('day-night-cycle', {
                 init: function () {
@@ -396,81 +469,6 @@
                 }
             });
 
-            /**
-             * bloom-effect
-             * Wires a THREE.EffectComposer (RenderPass + UnrealBloomPass) into the
-             * A-Frame render loop. CRITICAL: the composer's render target must be
-             * created with an alpha channel (RGBAFormat) and cleared transparently —
-             * otherwise the canvas becomes fully opaque and hides the AR.js camera
-             * feed sitting behind it, which is why the camera looked "broken" before.
-             */
-            AFRAME.registerComponent('bloom-effect', {
-                init: function () {
-                    var sceneEl = this.el;
-                    var self = this;
-
-                    sceneEl.addEventListener('renderstart', () => {
-                        var renderer = sceneEl.renderer;
-                        var camera = sceneEl.camera;
-                        var scene = sceneEl.object3D;
-
-                        renderer.setClearColor(0x000000, 0);
-
-                        // Mobile: render bloom pass at half resolution for performance.
-                        var resScale = IS_MOBILE ? 0.5 : 1;
-                        var w = window.innerWidth * resScale;
-                        var h = window.innerHeight * resScale;
-
-                        // Explicit alpha-capable render target — the fix for the
-                        // camera-feed-disappears-behind-bloom bug.
-                        var renderTarget = new THREE.WebGLRenderTarget(w, h, {
-                            minFilter: THREE.LinearFilter,
-                            magFilter: THREE.LinearFilter,
-                            format: THREE.RGBAFormat,
-                            stencilBuffer: false
-                        });
-
-                        var renderPass = new THREE.RenderPass(scene, camera);
-                        renderPass.clearAlpha = 0;
-
-                        var bloomPass = new THREE.UnrealBloomPass(
-                            new THREE.Vector2(w, h),
-                            0.55, // strength (base, adjusted live below)
-                            0.4,  // radius
-                            0.15  // threshold
-                        );
-
-                        var composer = new THREE.EffectComposer(renderer, renderTarget);
-                        composer.setSize(window.innerWidth, window.innerHeight);
-                        composer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
-                        composer.addPass(renderPass);
-                        composer.addPass(bloomPass);
-
-                        self.composer = composer;
-                        self.bloomPass = bloomPass;
-
-                        sceneEl.render = function () {
-                            composer.render();
-                        };
-
-                        function handleResize() {
-                            composer.setSize(window.innerWidth, window.innerHeight);
-                        }
-
-                        window.addEventListener('resize', handleResize);
-                        window.addEventListener('orientationchange', function () {
-                            setTimeout(handleResize, 250);
-                        });
-
-                        sceneEl.addEventListener('daynightchange', (e) => {
-                            var t = e.detail.nightAmount;
-                            bloomPass.strength = 0.35 + t * 1.1;
-                            bloomPass.radius = 0.35 + t * 0.25;
-                        });
-                    });
-                }
-            });
-
             // Cap pixel ratio and lock down mobile viewport quirks once the scene is ready.
             document.addEventListener('DOMContentLoaded', function () {
                 var scene = document.getElementById('scene');
@@ -482,13 +480,11 @@
                     }
                 });
 
-                // Optional portrait nudge for phones — AR marker tracking works best upright.
                 var warning = document.getElementById('orientation-warning');
                 if (IS_MOBILE) {
                     warning.classList.add('enabled');
                 }
 
-                // iOS Safari sometimes needs a resize kick after the address bar collapses.
                 window.addEventListener('load', function () {
                     setTimeout(function () {
                         window.dispatchEvent(new Event('resize'));
