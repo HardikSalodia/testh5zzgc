@@ -8,9 +8,15 @@
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="theme-color" content="#000000" />
 
-        <!-- Core AR.js / A-Frame stack -->
+        <!--
+            Core AR.js / A-Frame stack.
+            IMPORTANT: AR.js is pinned to a tagged release (3.4.7) instead of "master".
+            Pointing at master means AR.js can change under you without warning and
+            silently break camera init — this is a common cause of "camera stopped
+            working" reports that have nothing to do with your own code.
+        -->
         <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-        <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
         <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
         <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
         <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
@@ -140,6 +146,36 @@
                     display: flex;
                 }
             }
+
+            #camera-error {
+                display: none;
+                position: fixed;
+                inset: 0;
+                z-index: 10001;
+                background: rgba(0, 0, 0, 0.92);
+                color: #fff;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                padding: 32px;
+            }
+
+            #camera-error.visible {
+                display: flex;
+            }
+
+            #camera-error h2 {
+                font-size: 18px;
+                margin-bottom: 8px;
+            }
+
+            #camera-error p {
+                font-size: 14px;
+                opacity: 0.85;
+                max-width: 320px;
+                line-height: 1.5;
+            }
         </style>
     </head>
     <body>
@@ -177,12 +213,12 @@
             >
                 <a-entity
                     id="bowser-model"
-                    scale="0.21617513452299691 0.21617513452299691 0.21617513452299691"
                     animation-mixer="loop: repeat"
                     gltf-model="#animated-asset"
                     class="clickable"
                     gesture-handler
                     shadow="cast: false; receive: false"
+                    auto-fit-model="targetSize: 0.35"
                 ></a-entity>
             </a-marker>
 
@@ -201,9 +237,110 @@
             <p>Rotate your phone back to portrait for the best AR tracking.</p>
         </div>
 
+        <div id="camera-error">
+            <div>
+                <h2>Camera unavailable</h2>
+                <p id="camera-error-message">Checking camera access…</p>
+            </div>
+        </div>
+
         <script>
             // Detect mobile so we can drop render resolution / bloom cost further.
             var IS_MOBILE = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+
+            /**
+             * Camera preflight check.
+             * AR.js's own webcam init fails silently in a lot of common situations —
+             * insecure origin (not https/localhost), permission denied, or no camera
+             * present. This runs a quick getUserMedia test up front with the rear
+             * camera requested explicitly, shows a clear on-screen reason if it fails,
+             * and immediately releases the test stream so AR.js can open its own.
+             */
+            (function cameraPreflight() {
+                var errorBox = document.getElementById('camera-error');
+                var errorMessage = document.getElementById('camera-error-message');
+
+                function showError(message) {
+                    errorMessage.textContent = message;
+                    errorBox.classList.add('visible');
+                }
+
+                if (!window.isSecureContext) {
+                    showError('This page must be served over HTTPS (or http://localhost) for the camera to work. Opening the file directly, or loading it over plain HTTP on a remote host, will block camera access.');
+                    return;
+                }
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showError('This browser does not support camera access (getUserMedia unavailable). Try an up-to-date Chrome or Safari.');
+                    return;
+                }
+
+                navigator.mediaDevices
+                    .getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
+                    .then(function (stream) {
+                        // Permission granted — release immediately so AR.js can take over the camera.
+                        stream.getTracks().forEach(function (track) { track.stop(); });
+                    })
+                    .catch(function (err) {
+                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                            showError('Camera permission was denied. Enable camera access for this site in your browser settings and reload.');
+                        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                            showError('No camera was found on this device.');
+                        } else if (err.name === 'NotReadableError') {
+                            showError('The camera is already in use by another app. Close other camera apps/tabs and reload.');
+                        } else {
+                            showError('Camera error: ' + err.name + '. ' + (err.message || ''));
+                        }
+                    });
+            })();
+
+            /**
+             * auto-fit-model
+             * Waits for the glTF model to load, measures its real bounding box, then
+             * uniformly scales it to a target physical size and re-centers it so it
+             * sits upright on the marker. Replaces fragile hardcoded scale values that
+             * only worked for one specific .glb's dimensions.
+             */
+            AFRAME.registerComponent('auto-fit-model', {
+                schema: {
+                    targetSize: { type: 'number', default: 0.35 } // desired max dimension, in marker-space units
+                },
+                init: function () {
+                    var self = this;
+                    this.el.addEventListener('model-loaded', function (evt) {
+                        var mesh = evt.detail.model || self.el.getObject3D('mesh');
+                        if (!mesh) return;
+
+                        // Reset any prior transform before measuring.
+                        mesh.scale.set(1, 1, 1);
+                        mesh.position.set(0, 0, 0);
+                        mesh.updateMatrixWorld(true);
+
+                        var box = new THREE.Box3().setFromObject(mesh);
+                        var size = new THREE.Vector3();
+                        box.getSize(size);
+                        var center = new THREE.Vector3();
+                        box.getCenter(center);
+
+                        var maxDimension = Math.max(size.x, size.y, size.z) || 1;
+                        var scaleFactor = self.data.targetSize / maxDimension;
+
+                        // Uniform scale preserves proportions — never scale axes independently.
+                        self.el.setAttribute('scale', {
+                            x: scaleFactor,
+                            y: scaleFactor,
+                            z: scaleFactor
+                        });
+
+                        // Re-center horizontally and drop the model so its base sits on the marker (y = 0).
+                        self.el.setAttribute('position', {
+                            x: -center.x * scaleFactor,
+                            y: -box.min.y * scaleFactor,
+                            z: -center.z * scaleFactor
+                        });
+                    });
+                }
+            });
 
             /**
              * day-night-cycle
@@ -262,8 +399,10 @@
             /**
              * bloom-effect
              * Wires a THREE.EffectComposer (RenderPass + UnrealBloomPass) into the
-             * A-Frame render loop. Renders bloom at reduced resolution on mobile to
-             * keep frame rate stable on phone GPUs.
+             * A-Frame render loop. CRITICAL: the composer's render target must be
+             * created with an alpha channel (RGBAFormat) and cleared transparently —
+             * otherwise the canvas becomes fully opaque and hides the AR.js camera
+             * feed sitting behind it, which is why the camera looked "broken" before.
              */
             AFRAME.registerComponent('bloom-effect', {
                 init: function () {
@@ -275,12 +414,24 @@
                         var camera = sceneEl.camera;
                         var scene = sceneEl.object3D;
 
+                        renderer.setClearColor(0x000000, 0);
+
                         // Mobile: render bloom pass at half resolution for performance.
                         var resScale = IS_MOBILE ? 0.5 : 1;
                         var w = window.innerWidth * resScale;
                         var h = window.innerHeight * resScale;
 
+                        // Explicit alpha-capable render target — the fix for the
+                        // camera-feed-disappears-behind-bloom bug.
+                        var renderTarget = new THREE.WebGLRenderTarget(w, h, {
+                            minFilter: THREE.LinearFilter,
+                            magFilter: THREE.LinearFilter,
+                            format: THREE.RGBAFormat,
+                            stencilBuffer: false
+                        });
+
                         var renderPass = new THREE.RenderPass(scene, camera);
+                        renderPass.clearAlpha = 0;
 
                         var bloomPass = new THREE.UnrealBloomPass(
                             new THREE.Vector2(w, h),
@@ -289,7 +440,7 @@
                             0.15  // threshold
                         );
 
-                        var composer = new THREE.EffectComposer(renderer);
+                        var composer = new THREE.EffectComposer(renderer, renderTarget);
                         composer.setSize(window.innerWidth, window.innerHeight);
                         composer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
                         composer.addPass(renderPass);
