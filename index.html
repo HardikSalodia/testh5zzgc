@@ -1,201 +1,30 @@
 <!doctype html>
 <html>
     <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="theme-color" content="#000000" />
-
-        <!--
-            Core AR.js / A-Frame stack.
-            AR.js pinned to a tagged release (3.4.7) instead of "master" so it can't
-            change under you and silently break camera init.
-        -->
         <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-        <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
         <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
         <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
         <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
-
-        <!--
-            NOTE: full-screen post-processing bloom (EffectComposer + UnrealBloomPass)
-            was removed. It renders through its own opaque/off-screen render targets,
-            which repeatedly fought with the transparent canvas AR.js relies on to show
-            the camera feed underneath — that's what was causing the black screen.
-            The glow effect below is done with normal, forward-rendered scene objects
-            (emissive material + an additive glow sprite), so A-Frame's default render
-            path — and the camera passthrough — is never touched.
-        -->
-
-        <style>
-            html, body {
-                margin: 0;
-                padding: 0;
-                overflow: hidden;
-                background: #000;
-                width: 100%;
-                height: 100%;
-                touch-action: none;
-                overscroll-behavior: none;
-                -webkit-user-select: none;
-                user-select: none;
-            }
-
-            a-scene {
-                width: 100vw;
-                height: 100vh;
-            }
-
-            #ui-overlay {
-                position: fixed;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                z-index: 9999;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 8px;
-                padding: 14px 18px calc(20px + env(safe-area-inset-bottom, 0px));
-                background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                color: #fff;
-                pointer-events: none;
-            }
-
-            #ui-overlay > * {
-                pointer-events: auto;
-            }
-
-            #day-night-label {
-                font-size: 13px;
-                letter-spacing: 0.04em;
-                text-transform: uppercase;
-                opacity: 0.85;
-                display: flex;
-                justify-content: space-between;
-                width: min(340px, 82vw);
-            }
-
-            #day-night-slider {
-                width: min(340px, 82vw);
-                height: 30px;
-                -webkit-appearance: none;
-                appearance: none;
-                background: transparent;
-                outline: none;
-            }
-
-            #day-night-slider::-webkit-slider-runnable-track {
-                height: 6px;
-                border-radius: 999px;
-                background: linear-gradient(to right, #274b7a, #ffd98a);
-            }
-
-            #day-night-slider::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                appearance: none;
-                margin-top: -11px;
-                width: 28px;
-                height: 28px;
-                border-radius: 50%;
-                background: #fff;
-                box-shadow: 0 0 8px rgba(0, 0, 0, 0.55);
-                cursor: pointer;
-            }
-
-            #day-night-slider::-moz-range-track {
-                height: 6px;
-                border-radius: 999px;
-                background: linear-gradient(to right, #274b7a, #ffd98a);
-            }
-
-            #day-night-slider::-moz-range-thumb {
-                width: 28px;
-                height: 28px;
-                border: none;
-                border-radius: 50%;
-                background: #fff;
-                box-shadow: 0 0 8px rgba(0, 0, 0, 0.55);
-                cursor: pointer;
-            }
-
-            #orientation-warning {
-                display: none;
-                position: fixed;
-                inset: 0;
-                z-index: 10000;
-                background: #000;
-                color: #fff;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                padding: 24px;
-            }
-
-            @media (orientation: landscape) and (max-height: 500px) {
-                #orientation-warning.enabled {
-                    display: flex;
-                }
-            }
-
-            #camera-error {
-                display: none;
-                position: fixed;
-                inset: 0;
-                z-index: 10001;
-                background: rgba(0, 0, 0, 0.92);
-                color: #fff;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                padding: 32px;
-            }
-
-            #camera-error.visible {
-                display: flex;
-            }
-
-            #camera-error h2 {
-                font-size: 18px;
-                margin-bottom: 8px;
-            }
-
-            #camera-error p {
-                font-size: 14px;
-                opacity: 0.85;
-                max-width: 320px;
-                line-height: 1.5;
-            }
-        </style>
     </head>
-    <body>
+    <body style="margin: 0; overflow: hidden;">
         <a-scene
             vr-mode-ui="enabled: false;"
             loading-screen="enabled: false;"
-            renderer="antialias: false; precision: mediump; colorManagement: true; physicallyCorrectLights: true; logarithmicDepthBuffer: true; alpha: true;"
-            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; sourceWidth: 640; sourceHeight: 480;"
+            renderer="logarithmicDepthBuffer: true;"
+            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
             id="scene"
             embedded
             gesture-detector
-            day-night-cycle
         >
-            <a-assets timeout="15000">
+            <a-assets>
                 <a-asset-item
                     id="animated-asset"
                     src="assets/asset.glb"
-                ></a-asset-item>
+
+</a-asset-item>
+
             </a-assets>
-
-            <!-- Lighting rig: driven live by the day/night slider via day-night-cycle -->
-            <a-entity id="sun-light" light="type: directional; castShadow: false; intensity: 1.1; color: #fff3d6" position="-1 2 1"></a-entity>
-            <a-entity id="ambient-light" light="type: ambient; intensity: 0.55; color: #ffffff"></a-entity>
-            <a-entity id="hemi-light" light="type: hemisphere; color: #bcd8ff; groundColor: #2b2b2b; intensity: 0.6"></a-entity>
-
             <a-marker
                 id="animated-marker"
                 type="pattern"
@@ -204,293 +33,20 @@
                 raycaster="objects: .clickable"
                 emitevents="true"
                 cursor="fuse: false; rayOrigin: mouse;"
+                id="markerA"
             >
-                <!--
-                    No position attribute here, same as your original file — the model
-                    sits at the marker's own local origin, i.e. exactly on top of it.
-                    Only the scale is now computed automatically (see auto-fit-model)
-                    instead of a hardcoded magic number, so proportions stay correct
-                    no matter the asset's raw size. Tune the look with targetSize below.
-                -->
                 <a-entity
                     id="bowser-model"
+                    scale="0.21617513452299691 0.21617513452299691 0.21617513452299691"
                     animation-mixer="loop: repeat"
                     gltf-model="#animated-asset"
                     class="clickable"
                     gesture-handler
-                    shadow="cast: false; receive: false"
-                    auto-fit-model="targetSize: 0.35"
-                    model-night-glow
-                ></a-entity>
-            </a-marker>
 
+</a-entity>
+
+            </a-marker>
             <a-entity camera></a-entity>
         </a-scene>
-
-        <div id="ui-overlay">
-            <div id="day-night-label">
-                <span>☀️ Day</span>
-                <span>🌙 Night</span>
-            </div>
-            <input id="day-night-slider" type="range" min="0" max="100" value="20" />
-        </div>
-
-        <div id="orientation-warning">
-            <p>Rotate your phone back to portrait for the best AR tracking.</p>
-        </div>
-
-        <div id="camera-error">
-            <div>
-                <h2>Camera unavailable</h2>
-                <p id="camera-error-message">Checking camera access…</p>
-            </div>
-        </div>
-
-        <script>
-            // Detect mobile so we can drop render resolution for performance.
-            var IS_MOBILE = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
-
-            /**
-             * Camera preflight check.
-             * Tests getUserMedia up front with the rear camera requested explicitly,
-             * shows a clear on-screen reason if it fails, then immediately releases
-             * the test stream so AR.js can open its own.
-             */
-            (function cameraPreflight() {
-                var errorBox = document.getElementById('camera-error');
-                var errorMessage = document.getElementById('camera-error-message');
-
-                function showError(message) {
-                    errorMessage.textContent = message;
-                    errorBox.classList.add('visible');
-                }
-
-                if (!window.isSecureContext) {
-                    showError('This page must be served over HTTPS (or http://localhost) for the camera to work. Opening the file directly, or loading it over plain HTTP on a remote host, will block camera access.');
-                    return;
-                }
-
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    showError('This browser does not support camera access (getUserMedia unavailable). Try an up-to-date Chrome or Safari.');
-                    return;
-                }
-
-                navigator.mediaDevices
-                    .getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
-                    .then(function (stream) {
-                        stream.getTracks().forEach(function (track) { track.stop(); });
-                    })
-                    .catch(function (err) {
-                        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-                            showError('Camera permission was denied. Enable camera access for this site in your browser settings and reload.');
-                        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-                            showError('No camera was found on this device.');
-                        } else if (err.name === 'NotReadableError') {
-                            showError('The camera is already in use by another app. Close other camera apps/tabs and reload.');
-                        } else {
-                            showError('Camera error: ' + err.name + '. ' + (err.message || ''));
-                        }
-                    });
-            })();
-
-            /**
-             * auto-fit-model
-             * Measures the loaded model's real bounding box and applies a uniform
-             * scale to hit a target size — proportions stay correct regardless of the
-             * asset's raw dimensions. Position is intentionally left untouched so the
-             * model sits exactly where it did before (at the marker's local origin).
-             */
-            AFRAME.registerComponent('auto-fit-model', {
-                schema: {
-                    targetSize: { type: 'number', default: 0.35 } // desired max dimension, in marker-space units
-                },
-                init: function () {
-                    var self = this;
-                    this.el.addEventListener('model-loaded', function (evt) {
-                        var mesh = evt.detail.model || self.el.getObject3D('mesh');
-                        if (!mesh) return;
-
-                        mesh.scale.set(1, 1, 1);
-                        mesh.updateMatrixWorld(true);
-
-                        var box = new THREE.Box3().setFromObject(mesh);
-                        var size = new THREE.Vector3();
-                        box.getSize(size);
-
-                        var maxDimension = Math.max(size.x, size.y, size.z) || 1;
-                        var scaleFactor = self.data.targetSize / maxDimension;
-
-                        // Uniform scale only — never scale axes independently, that's
-                        // what causes stretched/squashed proportions.
-                        self.el.setAttribute('scale', {
-                            x: scaleFactor,
-                            y: scaleFactor,
-                            z: scaleFactor
-                        });
-
-                        self.el.emit('modelfitted', { scaleFactor: scaleFactor, size: size }, false);
-                    });
-                }
-            });
-
-            /**
-             * model-night-glow
-             * A safe stand-in for full-screen bloom: boosts emissive glow on the
-             * model's own materials and adds a soft additive glow sprite behind it.
-             * Both are normal forward-rendered scene content, so nothing here
-             * touches the render target the AR camera feed depends on.
-             */
-            AFRAME.registerComponent('model-night-glow', {
-                init: function () {
-                    var self = this;
-                    this.emissiveMaterials = [];
-                    this.glowSprite = null;
-
-                    this.el.addEventListener('model-loaded', function (evt) {
-                        var mesh = evt.detail.model || self.el.getObject3D('mesh');
-                        if (!mesh) return;
-
-                        // Collect any materials capable of emissive glow.
-                        mesh.traverse(function (node) {
-                            if (node.isMesh && node.material) {
-                                var mats = Array.isArray(node.material) ? node.material : [node.material];
-                                mats.forEach(function (mat) {
-                                    if ('emissive' in mat) {
-                                        mat.emissive = mat.emissive || new THREE.Color(0x000000);
-                                        mat.emissiveIntensity = 0;
-                                        self.emissiveMaterials.push(mat);
-                                    }
-                                });
-                            }
-                        });
-                    });
-
-                    this.el.addEventListener('modelfitted', function (evt) {
-                        var size = evt.detail.size;
-                        var scaleFactor = evt.detail.scaleFactor;
-                        self.createGlowSprite(size, scaleFactor);
-                    });
-
-                    this.el.sceneEl.addEventListener('daynightchange', function (e) {
-                        var t = e.detail.nightAmount;
-
-                        self.emissiveMaterials.forEach(function (mat) {
-                            mat.emissive.setRGB(1.0, 0.75, 0.4);
-                            mat.emissiveIntensity = t * 0.6;
-                        });
-
-                        if (self.glowSprite) {
-                            self.glowSprite.material.opacity = t * 0.75;
-                        }
-                    });
-                },
-
-                createGlowSprite: function (size, scaleFactor) {
-                    var canvas = document.createElement('canvas');
-                    canvas.width = 128;
-                    canvas.height = 128;
-                    var ctx = canvas.getContext('2d');
-                    var gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-                    gradient.addColorStop(0, 'rgba(255, 200, 120, 0.9)');
-                    gradient.addColorStop(1, 'rgba(255, 200, 120, 0)');
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, 128, 128);
-
-                    var texture = new THREE.CanvasTexture(canvas);
-                    var material = new THREE.SpriteMaterial({
-                        map: texture,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false,
-                        transparent: true,
-                        opacity: 0
-                    });
-
-                    var sprite = new THREE.Sprite(material);
-                    var glowSize = Math.max(size.x, size.y, size.z) * scaleFactor * 1.6;
-                    sprite.scale.set(glowSize, glowSize, 1);
-                    sprite.position.set(0, (size.y * scaleFactor) / 2, 0);
-
-                    this.el.object3D.add(sprite);
-                    this.glowSprite = sprite;
-                }
-            });
-
-            /**
-             * day-night-cycle
-             * Reads the slider (0 = full day, 100 = full night) and interpolates
-             * light color/intensity. Emits 'daynightchange' on the scene so other
-             * components (model-night-glow) can react.
-             */
-            AFRAME.registerComponent('day-night-cycle', {
-                init: function () {
-                    var self = this;
-                    this.slider = document.getElementById('day-night-slider');
-                    this.sun = document.getElementById('sun-light');
-                    this.ambient = document.getElementById('ambient-light');
-                    this.hemi = document.getElementById('hemi-light');
-
-                    this.dayColor = { sun: [1.0, 0.95, 0.84], ambient: [1, 1, 1], hemiSky: [0.74, 0.85, 1.0], hemiGround: [0.4, 0.38, 0.35] };
-                    this.nightColor = { sun: [0.55, 0.62, 0.95], ambient: [0.25, 0.28, 0.4], hemiSky: [0.08, 0.1, 0.22], hemiGround: [0.02, 0.02, 0.04] };
-
-                    this.lerp = function (a, b, t) { return a + (b - a) * t; };
-
-                    this.setLightColor = function (el, dayRgb, nightRgb, prop) {
-                        prop = prop || 'color';
-                        var t = self.slider.value / 100;
-                        var r = self.lerp(dayRgb[0], nightRgb[0], t);
-                        var g = self.lerp(dayRgb[1], nightRgb[1], t);
-                        var b = self.lerp(dayRgb[2], nightRgb[2], t);
-                        var hex = '#' + [r, g, b].map(function (c) {
-                            return Math.round(c * 255).toString(16).padStart(2, '0');
-                        }).join('');
-                        var attr = {};
-                        attr[prop] = hex;
-                        el.setAttribute('light', attr);
-                    };
-
-                    var apply = function (v) {
-                        var t = v / 100; // 0 = day, 1 = night
-                        self.setLightColor(self.sun, self.dayColor.sun, self.nightColor.sun);
-                        self.setLightColor(self.ambient, self.dayColor.ambient, self.nightColor.ambient);
-                        self.setLightColor(self.hemi, self.dayColor.hemiSky, self.nightColor.hemiSky, 'color');
-                        self.setLightColor(self.hemi, self.dayColor.hemiGround, self.nightColor.hemiGround, 'groundColor');
-
-                        self.sun.setAttribute('light', 'intensity', self.lerp(1.2, 0.15, t));
-                        self.ambient.setAttribute('light', 'intensity', self.lerp(0.6, 0.2, t));
-                        self.hemi.setAttribute('light', 'intensity', self.lerp(0.6, 0.35, t));
-
-                        self.el.emit('daynightchange', { nightAmount: t }, false);
-                    };
-
-                    this.slider.addEventListener('input', function (e) { apply(parseFloat(e.target.value)); });
-                    this.slider.addEventListener('change', function (e) { apply(parseFloat(e.target.value)); });
-
-                    apply(parseFloat(this.slider.value));
-                }
-            });
-
-            // Cap pixel ratio and lock down mobile viewport quirks once the scene is ready.
-            document.addEventListener('DOMContentLoaded', function () {
-                var scene = document.getElementById('scene');
-
-                scene.addEventListener('loaded', function () {
-                    var renderer = scene.renderer;
-                    if (renderer) {
-                        renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
-                    }
-                });
-
-                var warning = document.getElementById('orientation-warning');
-                if (IS_MOBILE) {
-                    warning.classList.add('enabled');
-                }
-
-                window.addEventListener('load', function () {
-                    setTimeout(function () {
-                        window.dispatchEvent(new Event('resize'));
-                    }, 300);
-                });
-            });
-        </script>
     </body>
 </html>
