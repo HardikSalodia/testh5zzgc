@@ -1,5 +1,5 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
 
 <head>
 
@@ -7,706 +7,378 @@
 
     <meta
         name="viewport"
-        content="width=device-width,
-        initial-scale=1.0,
-        maximum-scale=1.0,
-        user-scalable=no"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     >
-
-    <title>AR Experience</title>
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
 
-    <!-- AR.js 3.4.4 - compatible with A-Frame 1.0.4 -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.4/aframe/build/aframe-ar.js"></script>
+    <!-- AR.js -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 
-    <!-- A-Frame Extras for GLB animation -->
+    <!-- GLB animation -->
     <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
 
-    <style>
+    <!-- Gesture system -->
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
 
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: black;
-        }
-
-        #ui {
-            position: fixed;
-            z-index: 9999;
-
-            left: 20px;
-            right: 20px;
-            bottom: 25px;
-
-            padding: 18px;
-
-            background: rgba(0, 0, 0, 0.72);
-
-            border-radius: 18px;
-
-            color: white;
-
-            font-family:
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
-
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-
-        #timeLabel {
-            text-align: center;
-
-            font-size: 18px;
-            font-weight: 600;
-
-            margin-bottom: 10px;
-        }
-
-        #lightingSlider {
-            width: 100%;
-
-            height: 35px;
-
-            accent-color: white;
-        }
-
-        #status {
-            text-align: center;
-
-            margin-top: 7px;
-
-            font-size: 12px;
-
-            opacity: 0.7;
-        }
-
-        #loading {
-            position: fixed;
-
-            z-index: 10000;
-
-            inset: 0;
-
-            display: flex;
-
-            align-items: center;
-            justify-content: center;
-
-            background: black;
-
-            color: white;
-
-            font-family:
-                -apple-system,
-                BlinkMacSystemFont,
-                "Segoe UI",
-                sans-serif;
-
-            font-size: 18px;
-
-            text-align: center;
-        }
-
-    </style>
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
 
 </head>
 
 
-<body>
+<body style="margin:0; overflow:hidden;">
 
-    <!-- Loading screen -->
+<a-scene
 
-    <div id="loading">
-        Starting camera...
-    </div>
+    vr-mode-ui="enabled: false;"
 
+    loading-screen="enabled: false;"
 
-    <!-- UI -->
+    renderer="logarithmicDepthBuffer: true;"
 
-    <div id="ui">
+    arjs="
+        trackingMethod: best;
+        sourceType: webcam;
+        debugUIEnabled: false;
+    "
 
-        <div id="timeLabel">
-            DAY
-        </div>
+    id="scene"
 
-        <input
-            id="lightingSlider"
-            type="range"
-            min="0"
-            max="100"
-            value="0"
-        >
+    embedded
 
-        <div id="status">
-            Point your camera at the marker
-        </div>
-
-    </div>
+    gesture-detector
+>
 
 
-    <!-- AR SCENE -->
+    <!-- =========================
+         ASSETS
+    ========================== -->
 
-    <a-scene
+    <a-assets>
 
-        embedded
+        <a-asset-item
+            id="animated-asset"
+            src="assets/asset.glb">
+        </a-asset-item>
 
-        vr-mode-ui="enabled: false"
+    </a-assets>
 
-        loading-screen="enabled: false"
 
-        renderer="
-            logarithmicDepthBuffer: true;
-            precision: mediump;
-        "
+    <!-- =========================
+         MARKER
+    ========================== -->
 
-        arjs="
-            sourceType: webcam;
-            trackingMethod: best;
-            debugUIEnabled: false;
+    <a-marker
+
+        id="markerA"
+
+        type="pattern"
+
+        preset="custom"
+
+        url="assets/marker.patt"
+
+        raycaster="objects: .clickable"
+
+        emitevents="true"
+
+        cursor="
+            fuse: false;
+            rayOrigin: mouse;
         "
     >
 
 
-        <!-- ASSETS -->
-
-        <a-assets>
-
-            <a-asset-item
-                id="model"
-                src="assets/asset.glb">
-            </a-asset-item>
-
-        </a-assets>
-
-
-        <!-- LIGHTING -->
-
-        <!-- Main sunlight -->
+        <!-- =====================
+             MODEL
+        ====================== -->
 
         <a-entity
-            id="sunLight"
-            light="
-                type: directional;
-                color: #ffffff;
-                intensity: 1.5;
+
+            id="bowser-model"
+
+            gltf-model="#animated-asset"
+
+            scale="
+                0.216175
+                0.216175
+                0.216175
             "
-            position="2 4 3">
-        </a-entity>
 
+            position="0 0 0"
 
-        <!-- Ambient light -->
+            rotation="0 0 0"
 
-        <a-entity
-            id="ambientLight"
-            light="
-                type: ambient;
-                color: #ffffff;
-                intensity: 1;
-            ">
-        </a-entity>
-
-
-        <!-- Warm sunset light -->
-
-        <a-entity
-            id="sunsetLight"
-            light="
-                type: directional;
-                color: #ff8a3d;
-                intensity: 0;
+            animation-mixer="
+                loop: repeat;
             "
-            position="-2 3 1">
-        </a-entity>
 
+            class="clickable"
 
-        <!-- Cool night light -->
-
-        <a-entity
-            id="nightLight"
-            light="
-                type: directional;
-                color: #4466ff;
-                intensity: 0;
-            "
-            position="1 2 -2">
-        </a-entity>
-
-
-        <!-- MARKER -->
-
-        <a-marker
-
-            id="marker"
-
-            type="pattern"
-
-            url="assets/marker.patt"
-
-            emitevents="true"
-
-            raycaster="objects: .clickable"
-
-            cursor="
-                fuse: false;
-                rayOrigin: mouse;
-            "
+            gesture-handler
         >
+        </a-entity>
 
 
-            <!-- MODEL -->
-
-            <a-entity
-
-                id="arModel"
-
-                gltf-model="#model"
-
-                position="0 0 0"
-
-                scale="0.216 0.216 0.216"
-
-                rotation="0 0 0"
-
-                animation-mixer="
-                    loop: repeat;
-                "
-
-                class="clickable"
-
-            >
-            </a-entity>
+    </a-marker>
 
 
-        </a-marker>
+    <!-- CAMERA -->
+
+    <a-entity camera></a-entity>
 
 
-        <!-- CAMERA -->
-
-        <a-entity camera></a-entity>
-
-
-    </a-scene>
+</a-scene>
 
 
 <script>
 
 
 /* =====================================================
-   ELEMENTS
+   MODEL
 ===================================================== */
-
-const slider =
-    document.getElementById("lightingSlider");
-
-const timeLabel =
-    document.getElementById("timeLabel");
-
-const status =
-    document.getElementById("status");
-
-const loading =
-    document.getElementById("loading");
-
-
-const sun =
-    document.getElementById("sunLight");
-
-const ambient =
-    document.getElementById("ambientLight");
-
-const sunset =
-    document.getElementById("sunsetLight");
-
-const night =
-    document.getElementById("nightLight");
-
-const marker =
-    document.getElementById("marker");
 
 const model =
-    document.getElementById("arModel");
+    document.getElementById("bowser-model");
 
 
 /* =====================================================
-   CAMERA FILTER
+   1. TAP = SPIN
 ===================================================== */
 
-function updateCameraAppearance(value) {
-
-    /*
-        This changes the appearance of the
-        camera feed.
-
-        It does NOT change the physical
-        exposure of the iPhone camera.
-    */
-
-    let brightness = 1;
-
-    let saturation = 1;
-
-    let contrast = 1;
-
-    let hue = 0;
-
-
-    if (value < 25) {
-
-        // DAY
-
-        brightness = 1;
-        saturation = 1.05;
-        contrast = 1;
-
-    }
-
-    else if (value < 50) {
-
-        // AFTERNOON
-
-        const t =
-            (value - 25) / 25;
-
-        brightness =
-            1 - (0.08 * t);
-
-        saturation =
-            1.05 + (0.05 * t);
-
-        hue =
-            5 * t;
-
-    }
-
-    else if (value < 75) {
-
-        // SUNSET
-
-        const t =
-            (value - 50) / 25;
-
-        brightness =
-            0.92 - (0.08 * t);
-
-        saturation =
-            1.1 + (0.15 * t);
-
-        hue =
-            8 + (8 * t);
-
-    }
-
-    else {
-
-        // NIGHT
-
-        const t =
-            (value - 75) / 25;
-
-        brightness =
-            0.84 - (0.30 * t);
-
-        saturation =
-            1.15 - (0.35 * t);
-
-        contrast =
-            1.05;
-
-        hue =
-            16 - (16 * t);
-
-    }
-
-
-    document.body.style.filter =
-        `brightness(${brightness})
-         saturate(${saturation})
-         contrast(${contrast})
-         hue-rotate(${hue}deg)`;
-}
-
-
-/* =====================================================
-   3D LIGHTING
-===================================================== */
-
-function update3DLighting(value) {
-
-
-    /* -----------------------------
-       DAY
-    ----------------------------- */
-
-    if (value <= 30) {
-
-        const t =
-            value / 30;
-
-
-        sun.setAttribute(
-            "light",
-            "intensity",
-            1.5 - (0.3 * t)
-        );
-
-
-        ambient.setAttribute(
-            "light",
-            "intensity",
-            1 - (0.15 * t)
-        );
-
-
-        sunset.setAttribute(
-            "light",
-            "intensity",
-            0.05 + (0.15 * t)
-        );
-
-
-        night.setAttribute(
-            "light",
-            "intensity",
-            0
-        );
-
-    }
-
-
-    /* -----------------------------
-       SUNSET
-    ----------------------------- */
-
-    else if (value <= 65) {
-
-        const t =
-            (value - 30) / 35;
-
-
-        sun.setAttribute(
-            "light",
-            "intensity",
-            1.2 - (0.8 * t)
-        );
-
-
-        ambient.setAttribute(
-            "light",
-            "intensity",
-            0.85 - (0.35 * t)
-        );
-
-
-        sunset.setAttribute(
-            "light",
-            "intensity",
-            0.2 + (1.0 * t)
-        );
-
-
-        night.setAttribute(
-            "light",
-            "intensity",
-            0.05 + (0.15 * t)
-        );
-
-    }
-
-
-    /* -----------------------------
-       NIGHT
-    ----------------------------- */
-
-    else {
-
-        const t =
-            (value - 65) / 35;
-
-
-        sun.setAttribute(
-            "light",
-            "intensity",
-            0.4 - (0.3 * t)
-        );
-
-
-        ambient.setAttribute(
-            "light",
-            "intensity",
-            0.5 - (0.25 * t)
-        );
-
-
-        sunset.setAttribute(
-            "light",
-            "intensity",
-            1.2 - (1.2 * t)
-        );
-
-
-        night.setAttribute(
-            "light",
-            "intensity",
-            0.2 + (0.8 * t)
-        );
-
-    }
-
-}
-
-
-/* =====================================================
-   LABEL
-===================================================== */
-
-function updateLabel(value) {
-
-
-    if (value < 20) {
-
-        timeLabel.innerText =
-            "DAY";
-
-    }
-
-    else if (value < 40) {
-
-        timeLabel.innerText =
-            "AFTERNOON";
-
-    }
-
-    else if (value < 60) {
-
-        timeLabel.innerText =
-            "SUNSET";
-
-    }
-
-    else if (value < 80) {
-
-        timeLabel.innerText =
-            "EVENING";
-
-    }
-
-    else {
-
-        timeLabel.innerText =
-            "NIGHT";
-
-    }
-
-}
-
-
-/* =====================================================
-   SLIDER
-===================================================== */
-
-slider.addEventListener(
-    "input",
+model.addEventListener(
+    "click",
     function () {
 
-        const value =
-            Number(this.value);
+        const currentRotation =
+            this.getAttribute("rotation");
 
-
-        updateCameraAppearance(value);
-
-        update3DLighting(value);
-
-        updateLabel(value);
+        this.setAttribute(
+            "animation",
+            {
+                property: "rotation",
+                to: {
+                    x: currentRotation.x,
+                    y: currentRotation.y + 360,
+                    z: currentRotation.z
+                },
+                dur: 1000,
+                easing: "easeOutCubic"
+            }
+        );
 
     }
 );
 
 
 /* =====================================================
-   MARKER EVENTS
+   2. DOUBLE TAP = JUMP
 ===================================================== */
+
+let lastTap = 0;
+
+model.addEventListener(
+    "click",
+    function () {
+
+        const now =
+            Date.now();
+
+        if (
+            now - lastTap < 350
+        ) {
+
+            this.setAttribute(
+                "animation__jump",
+                {
+                    property: "position",
+                    from: "0 0 0",
+                    to: "0 0.5 0",
+                    dur: 250,
+                    easing: "easeOutQuad",
+                    dir: "alternate",
+                    loop: 2
+                }
+            );
+
+        }
+
+        lastTap = now;
+
+    }
+);
+
+
+/* =====================================================
+   3. MARKER FOUND
+===================================================== */
+
+const marker =
+    document.getElementById("markerA");
+
 
 marker.addEventListener(
     "markerFound",
     function () {
 
-        status.innerText =
-            "Marker detected";
+        console.log(
+            "AR MARKER FOUND"
+        );
 
-    }
-);
-
-
-marker.addEventListener(
-    "markerLost",
-    function () {
-
-        status.innerText =
-            "Point your camera at the marker";
-
-    }
-);
-
-
-/* =====================================================
-   AR READY
-===================================================== */
-
-document.querySelector("a-scene")
-.addEventListener(
-    "loaded",
-    function () {
-
-        loading.style.display =
-            "none";
-
-    }
-);
-
-
-/* =====================================================
-   INITIAL SETTINGS
-===================================================== */
-
-updateCameraAppearance(0);
-
-update3DLighting(0);
-
-updateLabel(0);
-
-
-/* =====================================================
-   SAFARI CAMERA CHECK
-===================================================== */
-
-window.addEventListener(
-    "load",
-    function () {
-
-        setTimeout(
-            function () {
-
-                loading.style.display =
-                    "none";
-
-            },
-            4000
+        model.setAttribute(
+            "animation__appear",
+            {
+                property: "scale",
+                from: "0 0 0",
+                to: "0.216175 0.216175 0.216175",
+                dur: 500,
+                easing: "easeOutBack"
+            }
         );
 
     }
 );
 
 
+/* =====================================================
+   4. MARKER LOST
+===================================================== */
+
+marker.addEventListener(
+    "markerLost",
+    function () {
+
+        console.log(
+            "AR MARKER LOST"
+        );
+
+    }
+);
+
+
+/* =====================================================
+   5. MODEL HOVER / POINTER
+===================================================== */
+
+model.addEventListener(
+    "mouseenter",
+    function () {
+
+        this.setAttribute(
+            "animation__hover",
+            {
+                property: "scale",
+                to: "0.235 0.235 0.235",
+                dur: 200,
+                easing: "easeOutQuad"
+            }
+        );
+
+    }
+);
+
+
+model.addEventListener(
+    "mouseleave",
+    function () {
+
+        this.setAttribute(
+            "animation__hover",
+            {
+                property: "scale",
+                to: "0.216175 0.216175 0.216175",
+                dur: 200,
+                easing: "easeOutQuad"
+            }
+        );
+
+    }
+);
+
+
+/* =====================================================
+   6. KEYBOARD INTERACTION
+   Useful for desktop testing
+===================================================== */
+
+document.addEventListener(
+    "keydown",
+    function (event) {
+
+        const rotation =
+            model.getAttribute("rotation");
+
+
+        if (event.key === "ArrowLeft") {
+
+            model.object3D.rotation.y -=
+                THREE.MathUtils.degToRad(10);
+
+        }
+
+
+        if (event.key === "ArrowRight") {
+
+            model.object3D.rotation.y +=
+                THREE.MathUtils.degToRad(10);
+
+        }
+
+
+        if (event.key === "ArrowUp") {
+
+            model.object3D.position.y +=
+                0.05;
+
+        }
+
+
+        if (event.key === "ArrowDown") {
+
+            model.object3D.position.y -=
+                0.05;
+
+        }
+
+    }
+);
+
+
+/* =====================================================
+   7. MODEL LOADED
+===================================================== */
+
+model.addEventListener(
+    "model-loaded",
+    function () {
+
+        console.log(
+            "MODEL LOADED SUCCESSFULLY"
+        );
+
+    }
+);
+
+
+/* =====================================================
+   8. MODEL ERROR
+===================================================== */
+
+model.addEventListener(
+    "model-error",
+    function (event) {
+
+        console.error(
+            "MODEL ERROR:",
+            event
+        );
+
+    }
+);
+
 </script>
+
 
 </body>
 </html>
