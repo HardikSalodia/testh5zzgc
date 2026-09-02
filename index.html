@@ -1,52 +1,980 @@
-<!doctype html>
-<html>
-    <head>
-        <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-        <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-        <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
-        <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
-        <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
-    </head>
-    <body style="margin: 0; overflow: hidden;">
-        <a-scene
-            vr-mode-ui="enabled: false;"
-            loading-screen="enabled: false;"
-            renderer="logarithmicDepthBuffer: true;"
-            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
-            id="scene"
-            embedded
-            gesture-detector
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+
+    <title>Marker AR — Day Night Lighting</title>
+
+    <!-- A-Frame 1.0.4 -->
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+
+    <!-- AR.js Marker Tracking -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+    <!-- GLTF/GLB animation support -->
+    <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
+
+    <!-- Gesture support -->
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+
+    <style>
+
+        /* ---------------------------------------------------------
+           BASIC PAGE
+        --------------------------------------------------------- */
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, Helvetica, sans-serif;
+            touch-action: none;
+        }
+
+
+        /* ---------------------------------------------------------
+           LIGHTING UI
+        --------------------------------------------------------- */
+
+        #lighting-ui {
+            position: fixed;
+
+            left: 50%;
+            bottom: 24px;
+
+            transform: translateX(-50%);
+
+            width: min(86vw, 360px);
+
+            padding: 14px 18px 15px;
+
+            box-sizing: border-box;
+
+            z-index: 9999;
+
+            border-radius: 18px;
+
+            background: rgba(0, 0, 0, 0.48);
+
+            border: 1px solid rgba(255, 255, 255, 0.20);
+
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+
+            color: white;
+
+            user-select: none;
+            -webkit-user-select: none;
+
+            pointer-events: auto;
+
+            touch-action: pan-x;
+        }
+
+
+        #lighting-title {
+            text-align: center;
+
+            font-size: 10px;
+
+            letter-spacing: 2px;
+
+            font-weight: 600;
+
+            opacity: 0.85;
+
+            margin-bottom: 10px;
+        }
+
+
+        #lighting-row {
+            display: flex;
+
+            align-items: center;
+
+            gap: 12px;
+
+            width: 100%;
+        }
+
+
+        .lighting-icon {
+            width: 24px;
+
+            text-align: center;
+
+            font-size: 18px;
+
+            flex-shrink: 0;
+        }
+
+
+        #lighting-slider {
+            flex: 1;
+
+            min-width: 0;
+
+            height: 28px;
+
+            margin: 0;
+
+            cursor: pointer;
+
+            accent-color: white;
+
+            touch-action: pan-x;
+        }
+
+
+        #lighting-value {
+            margin-top: 7px;
+
+            text-align: center;
+
+            font-size: 9px;
+
+            letter-spacing: 1.5px;
+
+            opacity: 0.65;
+        }
+
+
+        /* ---------------------------------------------------------
+           OPTIONAL MARKER STATUS
+        --------------------------------------------------------- */
+
+        #marker-status {
+            position: fixed;
+
+            top: 18px;
+            left: 50%;
+
+            transform: translateX(-50%);
+
+            z-index: 9999;
+
+            padding: 7px 13px;
+
+            border-radius: 20px;
+
+            background: rgba(0, 0, 0, 0.35);
+
+            border: 1px solid rgba(255, 255, 255, 0.15);
+
+            color: white;
+
+            font-size: 9px;
+
+            letter-spacing: 1.2px;
+
+            opacity: 0.75;
+
+            pointer-events: none;
+        }
+
+
+        /* ---------------------------------------------------------
+           MOBILE
+        --------------------------------------------------------- */
+
+        @media (max-width: 480px) {
+
+            #lighting-ui {
+                bottom: 18px;
+
+                width: calc(100vw - 36px);
+
+                padding: 13px 15px 14px;
+
+                border-radius: 16px;
+            }
+
+            #lighting-slider {
+                height: 30px;
+            }
+
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+    <!-- =========================================================
+         LIGHTING CONTROL
+    ========================================================== -->
+
+    <div id="lighting-ui">
+
+        <div id="lighting-title">
+            LIGHTING
+        </div>
+
+        <div id="lighting-row">
+
+            <div class="lighting-icon">
+                ☀
+            </div>
+
+            <input
+                id="lighting-slider"
+                type="range"
+                min="0"
+                max="100"
+                value="0"
+                step="1"
+                aria-label="Day to night lighting"
+            />
+
+            <div class="lighting-icon">
+                ☾
+            </div>
+
+        </div>
+
+        <div id="lighting-value">
+            DAY
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         MARKER STATUS
+    ========================================================== -->
+
+    <div id="marker-status">
+        SEARCHING FOR MARKER
+    </div>
+
+
+    <!-- =========================================================
+         A-FRAME AR SCENE
+    ========================================================== -->
+
+    <a-scene
+
+        id="scene"
+
+        embedded
+
+        vr-mode-ui="enabled: false"
+
+        loading-screen="enabled: false"
+
+        renderer="
+            logarithmicDepthBuffer: true;
+            colorManagement: true;
+            precision: mediump;
+        "
+
+        arjs="
+            trackingMethod: best;
+            sourceType: webcam;
+            debugUIEnabled: false;
+        "
+
+        gesture-detector
+    >
+
+
+        <!-- =====================================================
+             ASSETS
+        ====================================================== -->
+
+        <a-assets>
+
+            <a-asset-item
+                id="animated-asset"
+                src="assets/asset.glb"
+            ></a-asset-item>
+
+        </a-assets>
+
+
+        <!-- =====================================================
+             VIRTUAL LIGHTING
+        ====================================================== -->
+
+        <!-- Main ambient light -->
+        <a-entity
+            id="ambient-light"
+            light="
+                type: ambient;
+                color: #fff4df;
+                intensity: 2.2;
+            "
+        ></a-entity>
+
+
+        <!-- Main daytime sun -->
+        <a-entity
+            id="sun-light"
+            light="
+                type: directional;
+                color: #fff1d2;
+                intensity: 2.8;
+                castShadow: false;
+            "
+            position="2 4 3"
+        ></a-entity>
+
+
+        <!-- Secondary fill light -->
+        <a-entity
+            id="fill-light"
+            light="
+                type: directional;
+                color: #dce9ff;
+                intensity: 0.7;
+                castShadow: false;
+            "
+            position="-3 2 -2"
+        ></a-entity>
+
+
+        <!-- Moonlight used mainly during night -->
+        <a-entity
+            id="moon-light"
+            light="
+                type: directional;
+                color: #9dbdff;
+                intensity: 0;
+                castShadow: false;
+            "
+            position="-2 4 -3"
+        ></a-entity>
+
+
+        <!-- =====================================================
+             CUSTOM PATTERN MARKER
+        ====================================================== -->
+
+        <a-marker
+
+            id="markerA"
+
+            type="pattern"
+
+            preset="custom"
+
+            url="assets/marker.patt"
+
+            raycaster="objects: .clickable"
+
+            emitevents="true"
+
+            cursor="
+                fuse: false;
+                rayOrigin: mouse;
+            "
         >
-            <a-assets>
-                <a-asset-item
-                    id="animated-asset"
-                    src="assets/asset.glb"
 
-</a-asset-item>
 
-            </a-assets>
-            <a-marker
-                id="animated-marker"
-                type="pattern"
-                preset="custom"
-                url="assets/marker.patt"
-                raycaster="objects: .clickable"
-                emitevents="true"
-                cursor="fuse: false; rayOrigin: mouse;"
-                id="markerA"
-            >
-                <a-entity
-                    id="bowser-model"
-                    scale="0.21617513452299691 0.21617513452299691 0.21617513452299691"
-                    animation-mixer="loop: repeat"
-                    gltf-model="#animated-asset"
-                    class="clickable"
-                    gesture-handler
+            <!-- =================================================
+                 MODEL
+            ================================================== -->
 
-</a-entity>
+            <a-entity
 
-            </a-marker>
-            <a-entity camera></a-entity>
-        </a-scene>
-    </body>
+                id="bowser-model"
+
+                class="clickable"
+
+                scale="
+                    0.21617513452299691
+                    0.21617513452299691
+                    0.21617513452299691
+                "
+
+                animation-mixer="loop: repeat"
+
+                gltf-model="#animated-asset"
+
+                gesture-handler
+            ></a-entity>
+
+
+            <!-- =================================================
+                 LIGHTWEIGHT BLOOM / GLOW LAYER
+            ==================================================
+
+                 This is deliberately implemented as a subtle
+                 transparent glow rather than replacing A-Frame's
+                 renderer with EffectComposer.
+
+                 It keeps AR.js rendering stable on mobile.
+            ================================================== -->
+
+            <a-entity
+                id="bloom-layer"
+                visible="false"
+            ></a-entity>
+
+
+        </a-marker>
+
+
+        <!-- CAMERA -->
+        <a-entity camera></a-entity>
+
+    </a-scene>
+
+
+    <!-- =========================================================
+         JAVASCRIPT
+    ========================================================== -->
+
+    <script>
+
+        (function () {
+
+            "use strict";
+
+
+            /* =====================================================
+               REFERENCES
+            ====================================================== */
+
+            const scene = document.querySelector("#scene");
+
+            const marker = document.querySelector("#markerA");
+
+            const model = document.querySelector("#bowser-model");
+
+            const ambientLight =
+                document.querySelector("#ambient-light");
+
+            const sunLight =
+                document.querySelector("#sun-light");
+
+            const fillLight =
+                document.querySelector("#fill-light");
+
+            const moonLight =
+                document.querySelector("#moon-light");
+
+            const bloomLayer =
+                document.querySelector("#bloom-layer");
+
+            const slider =
+                document.querySelector("#lighting-slider");
+
+            const lightingValue =
+                document.querySelector("#lighting-value");
+
+            const markerStatus =
+                document.querySelector("#marker-status");
+
+
+            /* =====================================================
+               DAY / NIGHT VALUES
+            ====================================================== */
+
+            const DAY = {
+
+                ambient: 2.2,
+
+                sun: 2.8,
+
+                fill: 0.7,
+
+                moon: 0,
+
+                sunColor: "#fff1d2",
+
+                ambientColor: "#fff4df",
+
+                bloom: 0
+
+            };
+
+
+            const NIGHT = {
+
+                ambient: 0.28,
+
+                sun: 0.12,
+
+                fill: 0.08,
+
+                moon: 1.15,
+
+                sunColor: "#7f9dce",
+
+                ambientColor: "#8193b5",
+
+                bloom: 0.55
+
+            };
+
+
+            /* =====================================================
+               STATE
+            ====================================================== */
+
+            let targetNight = 0;
+
+            let currentNight = 0;
+
+            let bloomIntensity = 0;
+
+
+            /* =====================================================
+               HELPERS
+            ====================================================== */
+
+            function clamp(value, min, max) {
+
+                return Math.max(
+                    min,
+                    Math.min(max, value)
+                );
+
+            }
+
+
+            function lerp(a, b, t) {
+
+                return a + (b - a) * t;
+
+            }
+
+
+            function lerpColor(hexA, hexB, amount) {
+
+                const a = parseInt(
+                    hexA.replace("#", ""),
+                    16
+                );
+
+                const b = parseInt(
+                    hexB.replace("#", ""),
+                    16
+                );
+
+                const ar = (a >> 16) & 255;
+                const ag = (a >> 8) & 255;
+                const ab = a & 255;
+
+                const br = (b >> 16) & 255;
+                const bg = (b >> 8) & 255;
+                const bb = b & 255;
+
+                const r = Math.round(
+                    lerp(ar, br, amount)
+                );
+
+                const g = Math.round(
+                    lerp(ag, bg, amount)
+                );
+
+                const bl = Math.round(
+                    lerp(ab, bb, amount)
+                );
+
+                return (
+                    "#" +
+                    [r, g, bl]
+                        .map(function (v) {
+                            return v
+                                .toString(16)
+                                .padStart(2, "0");
+                        })
+                        .join("")
+                );
+
+            }
+
+
+            /* =====================================================
+               UPDATE SLIDER
+            ====================================================== */
+
+            function updateTargetLighting() {
+
+                targetNight =
+                    clamp(
+                        Number(slider.value) / 100,
+                        0,
+                        1
+                    );
+
+
+                const value =
+                    Number(slider.value);
+
+
+                if (value < 20) {
+
+                    lightingValue.textContent = "DAY";
+
+                } else if (value < 40) {
+
+                    lightingValue.textContent = "LATE AFTERNOON";
+
+                } else if (value < 60) {
+
+                    lightingValue.textContent = "SUNSET";
+
+                } else if (value < 80) {
+
+                    lightingValue.textContent = "EVENING";
+
+                } else {
+
+                    lightingValue.textContent = "NIGHT";
+
+                }
+
+            }
+
+
+            slider.addEventListener(
+                "input",
+                updateTargetLighting
+            );
+
+
+            slider.addEventListener(
+                "change",
+                updateTargetLighting
+            );
+
+
+            updateTargetLighting();
+
+
+            /* =====================================================
+               APPLY LIGHTING
+            ====================================================== */
+
+            function applyLighting() {
+
+                /*
+                 * Smoothly approach the slider's target.
+                 *
+                 * This prevents the lighting from snapping
+                 * immediately when the user moves the slider.
+                 */
+
+                currentNight = lerp(
+                    currentNight,
+                    targetNight,
+                    0.12
+                );
+
+
+                /* -----------------------------------------------
+                   Ambient light
+                ------------------------------------------------ */
+
+                const ambientIntensity = lerp(
+                    DAY.ambient,
+                    NIGHT.ambient,
+                    currentNight
+                );
+
+                ambientLight.setAttribute(
+                    "light",
+                    "intensity",
+                    ambientIntensity
+                );
+
+
+                /* -----------------------------------------------
+                   Sun
+                ------------------------------------------------ */
+
+                const sunIntensity = lerp(
+                    DAY.sun,
+                    NIGHT.sun,
+                    currentNight
+                );
+
+                sunLight.setAttribute(
+                    "light",
+                    "intensity",
+                    sunIntensity
+                );
+
+
+                /* -----------------------------------------------
+                   Fill
+                ------------------------------------------------ */
+
+                const fillIntensity = lerp(
+                    DAY.fill,
+                    NIGHT.fill,
+                    currentNight
+                );
+
+                fillLight.setAttribute(
+                    "light",
+                    "intensity",
+                    fillIntensity
+                );
+
+
+                /* -----------------------------------------------
+                   Moon
+                ------------------------------------------------ */
+
+                const moonIntensity = lerp(
+                    DAY.moon,
+                    NIGHT.moon,
+                    currentNight
+                );
+
+                moonLight.setAttribute(
+                    "light",
+                    "intensity",
+                    moonIntensity
+                );
+
+
+                /* -----------------------------------------------
+                   Light colors
+                ------------------------------------------------ */
+
+                const sunColor = lerpColor(
+                    DAY.sunColor,
+                    NIGHT.sunColor,
+                    currentNight
+                );
+
+                const ambientColor = lerpColor(
+                    DAY.ambientColor,
+                    NIGHT.ambientColor,
+                    currentNight
+                );
+
+
+                sunLight.setAttribute(
+                    "light",
+                    "color",
+                    sunColor
+                );
+
+
+                ambientLight.setAttribute(
+                    "light",
+                    "color",
+                    ambientColor
+                );
+
+
+                /* -----------------------------------------------
+                   Bloom intensity
+                ------------------------------------------------ */
+
+                bloomIntensity = lerp(
+                    DAY.bloom,
+                    NIGHT.bloom,
+                    currentNight
+                );
+
+
+                updateBloom();
+
+
+                /*
+                 * Keep animation running.
+                 * This loop only updates inexpensive values.
+                 */
+
+                requestAnimationFrame(applyLighting);
+
+            }
+
+
+            /* =====================================================
+               LIGHTWEIGHT BLOOM
+            ====================================================== */
+
+            function updateBloom() {
+
+                /*
+                 * A true UnrealBloomPass requires inserting an
+                 * EffectComposer into A-Frame's render pipeline.
+                 *
+                 * That can be unstable with older A-Frame/AR.js
+                 * versions on mobile.
+                 *
+                 * Instead we create a very subtle additive glow
+                 * around the virtual object.
+                 */
+
+
+                if (!marker.object3D.visible) {
+
+                    bloomLayer.setAttribute(
+                        "visible",
+                        false
+                    );
+
+                    return;
+
+                }
+
+
+                if (bloomIntensity < 0.02) {
+
+                    bloomLayer.setAttribute(
+                        "visible",
+                        false
+                    );
+
+                    return;
+
+                }
+
+
+                bloomLayer.setAttribute(
+                    "visible",
+                    true
+                );
+
+
+                /*
+                 * The layer is scaled slightly larger than the
+                 * actual model.
+                 */
+
+                const scale =
+                    1 +
+                    bloomIntensity * 0.045;
+
+
+                bloomLayer.setAttribute(
+                    "scale",
+                    scale + " " +
+                    scale + " " +
+                    scale
+                );
+
+
+                /*
+                 * Opacity is controlled by a custom glow
+                 * material when the layer is available.
+                 */
+
+                bloomLayer.setAttribute(
+                    "material",
+                    "shader: flat; color: #9dbdff; transparent: true; opacity: " +
+                    (bloomIntensity * 0.055) +
+                    "; blending: additive;"
+                );
+
+            }
+
+
+            /* =====================================================
+               START LIGHTING LOOP
+            ====================================================== */
+
+            scene.addEventListener(
+                "loaded",
+                function () {
+
+                    /*
+                     * Make sure renderer exists before accessing
+                     * the underlying Three.js renderer.
+                     */
+
+                    if (scene.renderer) {
+
+                        scene.renderer.outputEncoding =
+                            THREE.sRGBEncoding;
+
+                    }
+
+
+                    applyLighting();
+
+                }
+            );
+
+
+            /* =====================================================
+               MARKER FOUND
+            ====================================================== */
+
+            marker.addEventListener(
+                "markerFound",
+                function () {
+
+                    markerStatus.textContent =
+                        "MARKER FOUND";
+
+                    markerStatus.style.opacity = "0.9";
+
+                }
+            );
+
+
+            /* =====================================================
+               MARKER LOST
+            ====================================================== */
+
+            marker.addEventListener(
+                "markerLost",
+                function () {
+
+                    markerStatus.textContent =
+                        "SEARCHING FOR MARKER";
+
+                    markerStatus.style.opacity = "0.65";
+
+                }
+            );
+
+
+            /* =====================================================
+               PREVENT UI FROM PASSING TOUCH EVENTS TO AR
+            ====================================================== */
+
+            const lightingUI =
+                document.querySelector("#lighting-ui");
+
+
+            [
+                "touchstart",
+                "touchmove",
+                "touchend",
+                "pointerdown",
+                "pointermove",
+                "pointerup"
+            ].forEach(function (eventName) {
+
+                lightingUI.addEventListener(
+                    eventName,
+                    function (event) {
+
+                        event.stopPropagation();
+
+                    },
+                    {
+                        passive: false
+                    }
+                );
+
+            });
+
+
+        })();
+
+    </script>
+
+</body>
 </html>
