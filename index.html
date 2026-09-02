@@ -1,384 +1,75 @@
 <!doctype html>
 <html>
-
-<head>
-
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-    >
-
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-
-    <!-- AR.js -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-
-    <!-- GLB animation -->
-    <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
-
-    <!-- Gesture system -->
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
-
-    <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
-
-</head>
-
-
-<body style="margin:0; overflow:hidden;">
-
-<a-scene
-
-    vr-mode-ui="enabled: false;"
-
-    loading-screen="enabled: false;"
-
-    renderer="logarithmicDepthBuffer: true;"
-
-    arjs="
-        trackingMethod: best;
-        sourceType: webcam;
-        debugUIEnabled: false;
-    "
-
-    id="scene"
-
-    embedded
-
-    gesture-detector
->
-
-
-    <!-- =========================
-         ASSETS
-    ========================== -->
-
-    <a-assets>
-
-        <a-asset-item
-            id="animated-asset"
-            src="assets/asset.glb">
-        </a-asset-item>
-
-    </a-assets>
-
-
-    <!-- =========================
-         MARKER
-    ========================== -->
-
-    <a-marker
-
-        id="markerA"
-
-        type="pattern"
-
-        preset="custom"
-
-        url="assets/marker.patt"
-
-        raycaster="objects: .clickable"
-
-        emitevents="true"
-
-        cursor="
-            fuse: false;
-            rayOrigin: mouse;
-        "
-    >
-
-
-        <!-- =====================
-             MODEL
-        ====================== -->
-
-        <a-entity
-
-            id="bowser-model"
-
-            gltf-model="#animated-asset"
-
-            scale="
-                0.216175
-                0.216175
-                0.216175
-            "
-
-            position="0 0 0"
-
-            rotation="0 0 0"
-
-            animation-mixer="
-                loop: repeat;
-            "
-
-            class="clickable"
-
-            gesture-handler
-        >
-        </a-entity>
-
-
-    </a-marker>
-
-
-    <!-- CAMERA -->
-
-    <a-entity camera></a-entity>
-
-
-</a-scene>
-
-
-<script>
-
-
-/* =====================================================
-   MODEL
-===================================================== */
-
-const model =
-    document.getElementById("bowser-model");
-
-
-/* =====================================================
-   1. TAP = SPIN
-===================================================== */
-
-model.addEventListener(
-    "click",
-    function () {
-
-        const currentRotation =
-            this.getAttribute("rotation");
-
-        this.setAttribute(
-            "animation",
-            {
-                property: "rotation",
-                to: {
-                    x: currentRotation.x,
-                    y: currentRotation.y + 360,
-                    z: currentRotation.z
-                },
-                dur: 1000,
-                easing: "easeOutCubic"
-            }
-        );
-
-    }
-);
-
-
-/* =====================================================
-   2. DOUBLE TAP = JUMP
-===================================================== */
-
-let lastTap = 0;
-
-model.addEventListener(
-    "click",
-    function () {
-
-        const now =
-            Date.now();
-
-        if (
-            now - lastTap < 350
-        ) {
-
-            this.setAttribute(
-                "animation__jump",
-                {
-                    property: "position",
-                    from: "0 0 0",
-                    to: "0 0.5 0",
-                    dur: 250,
-                    easing: "easeOutQuad",
-                    dir: "alternate",
-                    loop: 2
+    <head>
+        <title>AR.js Interactive Model</title>
+        <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+        <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-detector.js"></script>
+        <script src="https://raw.githack.com/AR-js-org/studio-backend/master/src/modules/marker/tools/gesture-handler.js"></script>
+        
+        <script>
+            AFRAME.registerComponent('click-interaction', {
+                init: function () {
+                    const el = this.el;
+                    const originalScale = el.getAttribute('scale');
+                    
+                    // Listen for click or tap events
+                    el.addEventListener('click', function () {
+                        console.log('Model was clicked/tapped!');
+                        
+                        // Interaction 1: Briefly scale the model up (a "bump" effect)
+                        el.setAttribute('scale', '0.3 0.3 0.3');
+                        
+                        // Return to original scale after 300ms
+                        setTimeout(() => {
+                            el.setAttribute('scale', originalScale);
+                        }, 300);
+
+                        // Interaction 2: You can add more here (e.g., play a sound, change a color)
+                    });
                 }
-            );
+            });
+        </script>
+    </head>
+    <body style="margin: 0; overflow: hidden;">
+        <a-scene
+            vr-mode-ui="enabled: false;"
+            loading-screen="enabled: false;"
+            renderer="logarithmicDepthBuffer: true;"
+            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false;"
+            id="scene"
+            embedded
+            gesture-detector
+            cursor="fuse: false; rayOrigin: mouse;"
+            raycaster="objects: .clickable"
+        >
+            <a-assets>
+                <a-asset-item
+                    id="animated-asset"
+                    src="assets/asset.glb"
+                ></a-asset-item>
+            </a-assets>
 
-        }
+            <a-marker
+                id="animated-marker"
+                type="pattern"
+                preset="custom"
+                url="assets/marker.patt"
+                emitevents="true"
+            >
+                <a-entity
+                    id="bowser-model"
+                    scale="0.216 0.216 0.216"
+                    animation-mixer="loop: repeat"
+                    gltf-model="#animated-asset"
+                    class="clickable"
+                    gesture-handler
+                    click-interaction
+                ></a-entity>
+            </a-marker>
 
-        lastTap = now;
-
-    }
-);
-
-
-/* =====================================================
-   3. MARKER FOUND
-===================================================== */
-
-const marker =
-    document.getElementById("markerA");
-
-
-marker.addEventListener(
-    "markerFound",
-    function () {
-
-        console.log(
-            "AR MARKER FOUND"
-        );
-
-        model.setAttribute(
-            "animation__appear",
-            {
-                property: "scale",
-                from: "0 0 0",
-                to: "0.216175 0.216175 0.216175",
-                dur: 500,
-                easing: "easeOutBack"
-            }
-        );
-
-    }
-);
-
-
-/* =====================================================
-   4. MARKER LOST
-===================================================== */
-
-marker.addEventListener(
-    "markerLost",
-    function () {
-
-        console.log(
-            "AR MARKER LOST"
-        );
-
-    }
-);
-
-
-/* =====================================================
-   5. MODEL HOVER / POINTER
-===================================================== */
-
-model.addEventListener(
-    "mouseenter",
-    function () {
-
-        this.setAttribute(
-            "animation__hover",
-            {
-                property: "scale",
-                to: "0.235 0.235 0.235",
-                dur: 200,
-                easing: "easeOutQuad"
-            }
-        );
-
-    }
-);
-
-
-model.addEventListener(
-    "mouseleave",
-    function () {
-
-        this.setAttribute(
-            "animation__hover",
-            {
-                property: "scale",
-                to: "0.216175 0.216175 0.216175",
-                dur: 200,
-                easing: "easeOutQuad"
-            }
-        );
-
-    }
-);
-
-
-/* =====================================================
-   6. KEYBOARD INTERACTION
-   Useful for desktop testing
-===================================================== */
-
-document.addEventListener(
-    "keydown",
-    function (event) {
-
-        const rotation =
-            model.getAttribute("rotation");
-
-
-        if (event.key === "ArrowLeft") {
-
-            model.object3D.rotation.y -=
-                THREE.MathUtils.degToRad(10);
-
-        }
-
-
-        if (event.key === "ArrowRight") {
-
-            model.object3D.rotation.y +=
-                THREE.MathUtils.degToRad(10);
-
-        }
-
-
-        if (event.key === "ArrowUp") {
-
-            model.object3D.position.y +=
-                0.05;
-
-        }
-
-
-        if (event.key === "ArrowDown") {
-
-            model.object3D.position.y -=
-                0.05;
-
-        }
-
-    }
-);
-
-
-/* =====================================================
-   7. MODEL LOADED
-===================================================== */
-
-model.addEventListener(
-    "model-loaded",
-    function () {
-
-        console.log(
-            "MODEL LOADED SUCCESSFULLY"
-        );
-
-    }
-);
-
-
-/* =====================================================
-   8. MODEL ERROR
-===================================================== */
-
-model.addEventListener(
-    "model-error",
-    function (event) {
-
-        console.error(
-            "MODEL ERROR:",
-            event
-        );
-
-    }
-);
-
-</script>
-
-
-</body>
+            <a-entity camera></a-entity>
+        </a-scene>
+    </body>
 </html>
