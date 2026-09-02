@@ -2,7 +2,11 @@
 <html>
     <head>
         <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#000000" />
 
         <!-- Core AR.js / A-Frame stack -->
         <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
@@ -13,10 +17,9 @@
 
         <!--
             THREE.js post-processing addons for the bloom effect.
-            NOTE: these must match the three.js revision bundled inside your A-Frame build
-            (A-Frame 1.0.4 ships three.js r115). If bloom fails to appear, open devtools,
-            check the console for a version mismatch warning, and swap "0.115.0" below
-            for whatever `console.log(THREE.REVISION)` reports after AFRAME loads.
+            Must match the three.js revision bundled inside A-Frame 1.0.4 (r115).
+            If bloom doesn't appear, check `THREE.REVISION` in devtools and swap the
+            version below to match.
         -->
         <script src="https://unpkg.com/three@0.115.0/examples/js/shaders/CopyShader.js"></script>
         <script src="https://unpkg.com/three@0.115.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
@@ -28,8 +31,20 @@
         <style>
             html, body {
                 margin: 0;
+                padding: 0;
                 overflow: hidden;
                 background: #000;
+                width: 100%;
+                height: 100%;
+                touch-action: none;
+                overscroll-behavior: none;
+                -webkit-user-select: none;
+                user-select: none;
+            }
+
+            a-scene {
+                width: 100vw;
+                height: 100vh;
             }
 
             #ui-overlay {
@@ -41,9 +56,9 @@
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                gap: 6px;
-                padding: 14px 18px calc(18px + env(safe-area-inset-bottom, 0px));
-                background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+                gap: 8px;
+                padding: 14px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+                background: linear-gradient(to top, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0));
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 color: #fff;
                 pointer-events: none;
@@ -60,38 +75,70 @@
                 opacity: 0.85;
                 display: flex;
                 justify-content: space-between;
-                width: min(320px, 80vw);
+                width: min(340px, 82vw);
             }
 
             #day-night-slider {
-                width: min(320px, 80vw);
+                width: min(340px, 82vw);
+                height: 30px;
                 -webkit-appearance: none;
                 appearance: none;
+                background: transparent;
+                outline: none;
+            }
+
+            #day-night-slider::-webkit-slider-runnable-track {
                 height: 6px;
                 border-radius: 999px;
                 background: linear-gradient(to right, #274b7a, #ffd98a);
-                outline: none;
             }
 
             #day-night-slider::-webkit-slider-thumb {
                 -webkit-appearance: none;
                 appearance: none;
-                width: 20px;
-                height: 20px;
+                margin-top: -11px;
+                width: 28px;
+                height: 28px;
                 border-radius: 50%;
                 background: #fff;
-                box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+                box-shadow: 0 0 8px rgba(0, 0, 0, 0.55);
                 cursor: pointer;
             }
 
+            #day-night-slider::-moz-range-track {
+                height: 6px;
+                border-radius: 999px;
+                background: linear-gradient(to right, #274b7a, #ffd98a);
+            }
+
             #day-night-slider::-moz-range-thumb {
-                width: 20px;
-                height: 20px;
+                width: 28px;
+                height: 28px;
                 border: none;
                 border-radius: 50%;
                 background: #fff;
-                box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+                box-shadow: 0 0 8px rgba(0, 0, 0, 0.55);
                 cursor: pointer;
+            }
+
+            #orientation-warning {
+                display: none;
+                position: fixed;
+                inset: 0;
+                z-index: 10000;
+                background: #000;
+                color: #fff;
+                align-items: center;
+                justify-content: center;
+                text-align: center;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                padding: 24px;
+            }
+
+            @media (orientation: landscape) and (max-height: 500px) {
+                #orientation-warning.enabled {
+                    display: flex;
+                }
             }
         </style>
     </head>
@@ -99,8 +146,8 @@
         <a-scene
             vr-mode-ui="enabled: false;"
             loading-screen="enabled: false;"
-            renderer="antialias: false; precision: mediump; colorManagement: true; physicallyCorrectLights: true; logarithmicDepthBuffer: true;"
-            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+            renderer="antialias: false; precision: mediump; colorManagement: true; physicallyCorrectLights: true; logarithmicDepthBuffer: true; alpha: true;"
+            arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3; sourceWidth: 640; sourceHeight: 480; displayWidth: 640; displayHeight: 480;"
             id="scene"
             embedded
             gesture-detector
@@ -114,7 +161,7 @@
                 ></a-asset-item>
             </a-assets>
 
-            <!-- Lighting rig: driven live by the day/night slider via the day-night-cycle component -->
+            <!-- Lighting rig: driven live by the day/night slider via day-night-cycle -->
             <a-entity id="sun-light" light="type: directional; castShadow: false; intensity: 1.1; color: #fff3d6" position="-1 2 1"></a-entity>
             <a-entity id="ambient-light" light="type: ambient; intensity: 0.55; color: #ffffff"></a-entity>
             <a-entity id="hemi-light" light="type: hemisphere; color: #bcd8ff; groundColor: #2b2b2b; intensity: 0.6"></a-entity>
@@ -150,13 +197,19 @@
             <input id="day-night-slider" type="range" min="0" max="100" value="20" />
         </div>
 
+        <div id="orientation-warning">
+            <p>Rotate your phone back to portrait for the best AR tracking.</p>
+        </div>
+
         <script>
+            // Detect mobile so we can drop render resolution / bloom cost further.
+            var IS_MOBILE = /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+
             /**
              * day-night-cycle
              * Reads the slider (0 = full day, 100 = full night) and interpolates
-             * light color/intensity plus the fog/background tone. Also forwards the
-             * current "night amount" to the bloom-effect component so glow gets
-             * stronger after dark, which reads as a more natural lighting change.
+             * light color/intensity. Forwards the "night amount" to bloom-effect
+             * so glow strengthens after dark.
              */
             AFRAME.registerComponent('day-night-cycle', {
                 init: function () {
@@ -168,21 +221,6 @@
 
                     this.dayColor = { sun: [1.0, 0.95, 0.84], ambient: [1, 1, 1], hemiSky: [0.74, 0.85, 1.0], hemiGround: [0.4, 0.38, 0.35] };
                     this.nightColor = { sun: [0.55, 0.62, 0.95], ambient: [0.25, 0.28, 0.4], hemiSky: [0.08, 0.1, 0.22], hemiGround: [0.02, 0.02, 0.04] };
-
-                    var apply = function (v) {
-                        var t = v / 100; // 0 = day, 1 = night
-                        self.setLightColor(self.sun, self.dayColor.sun, self.nightColor.sun);
-                        self.setLightColor(self.ambient, self.dayColor.ambient, self.nightColor.ambient);
-                        self.setLightColor(self.hemi, self.dayColor.hemiSky, self.nightColor.hemiSky, 'color');
-                        self.setLightColor(self.hemi, self.dayColor.hemiGround, self.nightColor.hemiGround, 'groundColor');
-
-                        self.sun.setAttribute('light', 'intensity', self.lerp(1.2, 0.15, t));
-                        self.ambient.setAttribute('light', 'intensity', self.lerp(0.6, 0.2, t));
-                        self.hemi.setAttribute('light', 'intensity', self.lerp(0.6, 0.35, t));
-
-                        // let the bloom pass know so night scenes glow more
-                        self.el.emit('daynightchange', { nightAmount: t }, false);
-                    };
 
                     this.lerp = function (a, b, t) { return a + (b - a) * t; };
 
@@ -200,8 +238,23 @@
                         el.setAttribute('light', attr);
                     };
 
+                    var apply = function (v) {
+                        var t = v / 100; // 0 = day, 1 = night
+                        self.setLightColor(self.sun, self.dayColor.sun, self.nightColor.sun);
+                        self.setLightColor(self.ambient, self.dayColor.ambient, self.nightColor.ambient);
+                        self.setLightColor(self.hemi, self.dayColor.hemiSky, self.nightColor.hemiSky, 'color');
+                        self.setLightColor(self.hemi, self.dayColor.hemiGround, self.nightColor.hemiGround, 'groundColor');
+
+                        self.sun.setAttribute('light', 'intensity', self.lerp(1.2, 0.15, t));
+                        self.ambient.setAttribute('light', 'intensity', self.lerp(0.6, 0.2, t));
+                        self.hemi.setAttribute('light', 'intensity', self.lerp(0.6, 0.35, t));
+
+                        self.el.emit('daynightchange', { nightAmount: t }, false);
+                    };
+
                     this.slider.addEventListener('input', function (e) { apply(parseFloat(e.target.value)); });
-                    // initialize once assets/scene are ready
+                    this.slider.addEventListener('change', function (e) { apply(parseFloat(e.target.value)); });
+
                     apply(parseFloat(this.slider.value));
                 }
             });
@@ -209,22 +262,28 @@
             /**
              * bloom-effect
              * Wires a THREE.EffectComposer (RenderPass + UnrealBloomPass) into the
-             * A-Frame render loop by overriding the scene's own render() call.
-             * Bloom strength ramps up automatically at night for a nicer glow.
+             * A-Frame render loop. Renders bloom at reduced resolution on mobile to
+             * keep frame rate stable on phone GPUs.
              */
             AFRAME.registerComponent('bloom-effect', {
                 init: function () {
                     var sceneEl = this.el;
+                    var self = this;
 
                     sceneEl.addEventListener('renderstart', () => {
                         var renderer = sceneEl.renderer;
                         var camera = sceneEl.camera;
                         var scene = sceneEl.object3D;
 
+                        // Mobile: render bloom pass at half resolution for performance.
+                        var resScale = IS_MOBILE ? 0.5 : 1;
+                        var w = window.innerWidth * resScale;
+                        var h = window.innerHeight * resScale;
+
                         var renderPass = new THREE.RenderPass(scene, camera);
 
                         var bloomPass = new THREE.UnrealBloomPass(
-                            new THREE.Vector2(window.innerWidth, window.innerHeight),
+                            new THREE.Vector2(w, h),
                             0.55, // strength (base, adjusted live below)
                             0.4,  // radius
                             0.15  // threshold
@@ -232,25 +291,28 @@
 
                         var composer = new THREE.EffectComposer(renderer);
                         composer.setSize(window.innerWidth, window.innerHeight);
+                        composer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
                         composer.addPass(renderPass);
                         composer.addPass(bloomPass);
 
-                        this.composer = composer;
-                        this.bloomPass = bloomPass;
+                        self.composer = composer;
+                        self.bloomPass = bloomPass;
 
-                        // Route A-Frame's per-frame render through the composer instead
-                        // of the default renderer.render() call.
                         sceneEl.render = function () {
                             composer.render();
                         };
 
-                        window.addEventListener('resize', () => {
+                        function handleResize() {
                             composer.setSize(window.innerWidth, window.innerHeight);
+                        }
+
+                        window.addEventListener('resize', handleResize);
+                        window.addEventListener('orientationchange', function () {
+                            setTimeout(handleResize, 250);
                         });
 
                         sceneEl.addEventListener('daynightchange', (e) => {
                             var t = e.detail.nightAmount;
-                            // more glow after dark, subtle in daylight
                             bloomPass.strength = 0.35 + t * 1.1;
                             bloomPass.radius = 0.35 + t * 0.25;
                         });
@@ -258,14 +320,28 @@
                 }
             });
 
-            // Cap device pixel ratio for performance on high-DPI phones.
+            // Cap pixel ratio and lock down mobile viewport quirks once the scene is ready.
             document.addEventListener('DOMContentLoaded', function () {
                 var scene = document.getElementById('scene');
+
                 scene.addEventListener('loaded', function () {
                     var renderer = scene.renderer;
                     if (renderer) {
-                        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+                        renderer.setPixelRatio(Math.min(window.devicePixelRatio, IS_MOBILE ? 1.5 : 2));
                     }
+                });
+
+                // Optional portrait nudge for phones — AR marker tracking works best upright.
+                var warning = document.getElementById('orientation-warning');
+                if (IS_MOBILE) {
+                    warning.classList.add('enabled');
+                }
+
+                // iOS Safari sometimes needs a resize kick after the address bar collapses.
+                window.addEventListener('load', function () {
+                    setTimeout(function () {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 300);
                 });
             });
         </script>
