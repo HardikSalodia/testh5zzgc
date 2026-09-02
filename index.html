@@ -1,11 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
+
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Camera Test</title>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width,
+        initial-scale=1.0,
+        maximum-scale=1.0,
+        user-scalable=no"
+    >
+
+    <title>AR Experience</title>
+
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+
+    <!-- AR.js 3.4.4 - compatible with A-Frame 1.0.4 -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.4/aframe/build/aframe-ar.js"></script>
+
+    <!-- A-Frame Extras for GLB animation -->
+    <script src="https://raw.githack.com/donmccurdy/aframe-extras/master/dist/aframe-extras.loaders.min.js"></script>
 
     <style>
-        html, body {
+
+        html,
+        body {
             margin: 0;
             padding: 0;
             width: 100%;
@@ -14,96 +36,675 @@
             background: black;
         }
 
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        #start {
+        #ui {
             position: fixed;
-            z-index: 10;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
+            z-index: 9999;
 
-            padding: 18px 30px;
-            font-size: 18px;
-            border: none;
-            border-radius: 12px;
-            background: white;
-            color: black;
-        }
-
-        #error {
-            position: fixed;
-            z-index: 20;
             left: 20px;
             right: 20px;
-            bottom: 30px;
+            bottom: 25px;
 
-            padding: 15px;
-            background: rgba(0,0,0,.8);
+            padding: 18px;
+
+            background: rgba(0, 0, 0, 0.72);
+
+            border-radius: 18px;
+
             color: white;
-            font-family: sans-serif;
-            font-size: 14px;
-            border-radius: 10px;
-            display: none;
+
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
+
+        #timeLabel {
+            text-align: center;
+
+            font-size: 18px;
+            font-weight: 600;
+
+            margin-bottom: 10px;
+        }
+
+        #lightingSlider {
+            width: 100%;
+
+            height: 35px;
+
+            accent-color: white;
+        }
+
+        #status {
+            text-align: center;
+
+            margin-top: 7px;
+
+            font-size: 12px;
+
+            opacity: 0.7;
+        }
+
+        #loading {
+            position: fixed;
+
+            z-index: 10000;
+
+            inset: 0;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            background: black;
+
+            color: white;
+
+            font-family:
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            font-size: 18px;
+
+            text-align: center;
+        }
+
     </style>
+
 </head>
+
 
 <body>
 
-<button id="start">START CAMERA</button>
+    <!-- Loading screen -->
 
-<video
-    id="video"
-    autoplay
-    playsinline
-    muted>
-</video>
+    <div id="loading">
+        Starting camera...
+    </div>
 
-<div id="error"></div>
+
+    <!-- UI -->
+
+    <div id="ui">
+
+        <div id="timeLabel">
+            DAY
+        </div>
+
+        <input
+            id="lightingSlider"
+            type="range"
+            min="0"
+            max="100"
+            value="0"
+        >
+
+        <div id="status">
+            Point your camera at the marker
+        </div>
+
+    </div>
+
+
+    <!-- AR SCENE -->
+
+    <a-scene
+
+        embedded
+
+        vr-mode-ui="enabled: false"
+
+        loading-screen="enabled: false"
+
+        renderer="
+            logarithmicDepthBuffer: true;
+            precision: mediump;
+        "
+
+        arjs="
+            sourceType: webcam;
+            trackingMethod: best;
+            debugUIEnabled: false;
+        "
+    >
+
+
+        <!-- ASSETS -->
+
+        <a-assets>
+
+            <a-asset-item
+                id="model"
+                src="assets/asset.glb">
+            </a-asset-item>
+
+        </a-assets>
+
+
+        <!-- LIGHTING -->
+
+        <!-- Main sunlight -->
+
+        <a-entity
+            id="sunLight"
+            light="
+                type: directional;
+                color: #ffffff;
+                intensity: 1.5;
+            "
+            position="2 4 3">
+        </a-entity>
+
+
+        <!-- Ambient light -->
+
+        <a-entity
+            id="ambientLight"
+            light="
+                type: ambient;
+                color: #ffffff;
+                intensity: 1;
+            ">
+        </a-entity>
+
+
+        <!-- Warm sunset light -->
+
+        <a-entity
+            id="sunsetLight"
+            light="
+                type: directional;
+                color: #ff8a3d;
+                intensity: 0;
+            "
+            position="-2 3 1">
+        </a-entity>
+
+
+        <!-- Cool night light -->
+
+        <a-entity
+            id="nightLight"
+            light="
+                type: directional;
+                color: #4466ff;
+                intensity: 0;
+            "
+            position="1 2 -2">
+        </a-entity>
+
+
+        <!-- MARKER -->
+
+        <a-marker
+
+            id="marker"
+
+            type="pattern"
+
+            url="assets/marker.patt"
+
+            emitevents="true"
+
+            raycaster="objects: .clickable"
+
+            cursor="
+                fuse: false;
+                rayOrigin: mouse;
+            "
+        >
+
+
+            <!-- MODEL -->
+
+            <a-entity
+
+                id="arModel"
+
+                gltf-model="#model"
+
+                position="0 0 0"
+
+                scale="0.216 0.216 0.216"
+
+                rotation="0 0 0"
+
+                animation-mixer="
+                    loop: repeat;
+                "
+
+                class="clickable"
+
+            >
+            </a-entity>
+
+
+        </a-marker>
+
+
+        <!-- CAMERA -->
+
+        <a-entity camera></a-entity>
+
+
+    </a-scene>
+
 
 <script>
 
-const video = document.getElementById("video");
-const button = document.getElementById("start");
-const error = document.getElementById("error");
 
-button.addEventListener("click", async () => {
+/* =====================================================
+   ELEMENTS
+===================================================== */
 
-    try {
+const slider =
+    document.getElementById("lightingSlider");
 
-        error.style.display = "none";
+const timeLabel =
+    document.getElementById("timeLabel");
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: "environment"
-            },
-            audio: false
-        });
+const status =
+    document.getElementById("status");
 
-        video.srcObject = stream;
+const loading =
+    document.getElementById("loading");
 
-        await video.play();
 
-        button.style.display = "none";
+const sun =
+    document.getElementById("sunLight");
 
-    } catch (err) {
+const ambient =
+    document.getElementById("ambientLight");
 
-        console.error(err);
+const sunset =
+    document.getElementById("sunsetLight");
 
-        error.innerHTML =
-            "Camera error:<br>" +
-            err.name + "<br>" +
-            err.message;
+const night =
+    document.getElementById("nightLight");
 
-        error.style.display = "block";
+const marker =
+    document.getElementById("marker");
+
+const model =
+    document.getElementById("arModel");
+
+
+/* =====================================================
+   CAMERA FILTER
+===================================================== */
+
+function updateCameraAppearance(value) {
+
+    /*
+        This changes the appearance of the
+        camera feed.
+
+        It does NOT change the physical
+        exposure of the iPhone camera.
+    */
+
+    let brightness = 1;
+
+    let saturation = 1;
+
+    let contrast = 1;
+
+    let hue = 0;
+
+
+    if (value < 25) {
+
+        // DAY
+
+        brightness = 1;
+        saturation = 1.05;
+        contrast = 1;
+
     }
 
-});
+    else if (value < 50) {
+
+        // AFTERNOON
+
+        const t =
+            (value - 25) / 25;
+
+        brightness =
+            1 - (0.08 * t);
+
+        saturation =
+            1.05 + (0.05 * t);
+
+        hue =
+            5 * t;
+
+    }
+
+    else if (value < 75) {
+
+        // SUNSET
+
+        const t =
+            (value - 50) / 25;
+
+        brightness =
+            0.92 - (0.08 * t);
+
+        saturation =
+            1.1 + (0.15 * t);
+
+        hue =
+            8 + (8 * t);
+
+    }
+
+    else {
+
+        // NIGHT
+
+        const t =
+            (value - 75) / 25;
+
+        brightness =
+            0.84 - (0.30 * t);
+
+        saturation =
+            1.15 - (0.35 * t);
+
+        contrast =
+            1.05;
+
+        hue =
+            16 - (16 * t);
+
+    }
+
+
+    document.body.style.filter =
+        `brightness(${brightness})
+         saturate(${saturation})
+         contrast(${contrast})
+         hue-rotate(${hue}deg)`;
+}
+
+
+/* =====================================================
+   3D LIGHTING
+===================================================== */
+
+function update3DLighting(value) {
+
+
+    /* -----------------------------
+       DAY
+    ----------------------------- */
+
+    if (value <= 30) {
+
+        const t =
+            value / 30;
+
+
+        sun.setAttribute(
+            "light",
+            "intensity",
+            1.5 - (0.3 * t)
+        );
+
+
+        ambient.setAttribute(
+            "light",
+            "intensity",
+            1 - (0.15 * t)
+        );
+
+
+        sunset.setAttribute(
+            "light",
+            "intensity",
+            0.05 + (0.15 * t)
+        );
+
+
+        night.setAttribute(
+            "light",
+            "intensity",
+            0
+        );
+
+    }
+
+
+    /* -----------------------------
+       SUNSET
+    ----------------------------- */
+
+    else if (value <= 65) {
+
+        const t =
+            (value - 30) / 35;
+
+
+        sun.setAttribute(
+            "light",
+            "intensity",
+            1.2 - (0.8 * t)
+        );
+
+
+        ambient.setAttribute(
+            "light",
+            "intensity",
+            0.85 - (0.35 * t)
+        );
+
+
+        sunset.setAttribute(
+            "light",
+            "intensity",
+            0.2 + (1.0 * t)
+        );
+
+
+        night.setAttribute(
+            "light",
+            "intensity",
+            0.05 + (0.15 * t)
+        );
+
+    }
+
+
+    /* -----------------------------
+       NIGHT
+    ----------------------------- */
+
+    else {
+
+        const t =
+            (value - 65) / 35;
+
+
+        sun.setAttribute(
+            "light",
+            "intensity",
+            0.4 - (0.3 * t)
+        );
+
+
+        ambient.setAttribute(
+            "light",
+            "intensity",
+            0.5 - (0.25 * t)
+        );
+
+
+        sunset.setAttribute(
+            "light",
+            "intensity",
+            1.2 - (1.2 * t)
+        );
+
+
+        night.setAttribute(
+            "light",
+            "intensity",
+            0.2 + (0.8 * t)
+        );
+
+    }
+
+}
+
+
+/* =====================================================
+   LABEL
+===================================================== */
+
+function updateLabel(value) {
+
+
+    if (value < 20) {
+
+        timeLabel.innerText =
+            "DAY";
+
+    }
+
+    else if (value < 40) {
+
+        timeLabel.innerText =
+            "AFTERNOON";
+
+    }
+
+    else if (value < 60) {
+
+        timeLabel.innerText =
+            "SUNSET";
+
+    }
+
+    else if (value < 80) {
+
+        timeLabel.innerText =
+            "EVENING";
+
+    }
+
+    else {
+
+        timeLabel.innerText =
+            "NIGHT";
+
+    }
+
+}
+
+
+/* =====================================================
+   SLIDER
+===================================================== */
+
+slider.addEventListener(
+    "input",
+    function () {
+
+        const value =
+            Number(this.value);
+
+
+        updateCameraAppearance(value);
+
+        update3DLighting(value);
+
+        updateLabel(value);
+
+    }
+);
+
+
+/* =====================================================
+   MARKER EVENTS
+===================================================== */
+
+marker.addEventListener(
+    "markerFound",
+    function () {
+
+        status.innerText =
+            "Marker detected";
+
+    }
+);
+
+
+marker.addEventListener(
+    "markerLost",
+    function () {
+
+        status.innerText =
+            "Point your camera at the marker";
+
+    }
+);
+
+
+/* =====================================================
+   AR READY
+===================================================== */
+
+document.querySelector("a-scene")
+.addEventListener(
+    "loaded",
+    function () {
+
+        loading.style.display =
+            "none";
+
+    }
+);
+
+
+/* =====================================================
+   INITIAL SETTINGS
+===================================================== */
+
+updateCameraAppearance(0);
+
+update3DLighting(0);
+
+updateLabel(0);
+
+
+/* =====================================================
+   SAFARI CAMERA CHECK
+===================================================== */
+
+window.addEventListener(
+    "load",
+    function () {
+
+        setTimeout(
+            function () {
+
+                loading.style.display =
+                    "none";
+
+            },
+            4000
+        );
+
+    }
+);
+
 
 </script>
 
